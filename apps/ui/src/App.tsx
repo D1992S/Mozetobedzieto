@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { SyncCompleteEvent, SyncErrorEvent, SyncProgressEvent } from '@moze/shared';
-import { DEFAULT_CHANNEL_ID, buildDateRange, useAppStatusQuery, useChannelInfoQuery, useDataModeStatusQuery, useKpisQuery, useProbeDataModeMutation, useResumeSyncMutation, useSetDataModeMutation, useStartSyncMutation, useTimeseriesQuery } from './hooks/use-dashboard-data.ts';
+import type { MlTargetMetric, SyncCompleteEvent, SyncErrorEvent, SyncProgressEvent } from '@moze/shared';
+import { DEFAULT_CHANNEL_ID, buildDateRange, useAppStatusQuery, useChannelInfoQuery, useDataModeStatusQuery, useKpisQuery, useMlForecastQuery, useProbeDataModeMutation, useResumeSyncMutation, useRunMlBaselineMutation, useSetDataModeMutation, useStartSyncMutation, useTimeseriesQuery } from './hooks/use-dashboard-data.ts';
 import { useAppStore } from './store/index.ts';
 
 function formatNumber(value: number): string {
@@ -14,6 +14,7 @@ export function App() {
   const [lastCompleteEvent, setLastCompleteEvent] = useState<SyncCompleteEvent | null>(null);
   const [lastErrorEvent, setLastErrorEvent] = useState<SyncErrorEvent | null>(null);
   const [resumeSyncRunId, setResumeSyncRunId] = useState<number | null>(null);
+  const mlTargetMetric: MlTargetMetric = 'views';
   const dateRange = useMemo(() => buildDateRange(30), []);
   const channelId = DEFAULT_CHANNEL_ID;
 
@@ -23,10 +24,12 @@ export function App() {
   const probeModeMutation = useProbeDataModeMutation();
   const startSyncMutation = useStartSyncMutation();
   const resumeSyncMutation = useResumeSyncMutation();
+  const runMlMutation = useRunMlBaselineMutation();
   const dataEnabled = isDesktopRuntime && statusQuery.data?.dbReady === true;
   const channelInfoQuery = useChannelInfoQuery(channelId, dataEnabled);
   const kpisQuery = useKpisQuery(channelId, dateRange, dataEnabled);
   const timeseriesQuery = useTimeseriesQuery(channelId, dateRange, dataEnabled);
+  const mlForecastQuery = useMlForecastQuery(channelId, mlTargetMetric, dataEnabled);
 
   useEffect(() => {
     setInitialized(statusQuery.data?.dbReady === true);
@@ -93,6 +96,8 @@ export function App() {
   const kpis = kpisQuery.data;
   const timeseries = timeseriesQuery.data;
   const latestPoint = timeseries?.points[timeseries.points.length - 1];
+  const mlForecast = mlForecastQuery.data;
+  const latestForecastPoint = mlForecast?.points[mlForecast.points.length - 1];
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
@@ -152,6 +157,41 @@ export function App() {
         <p>
           Blad sync ({lastErrorEvent.code}): {lastErrorEvent.message} {lastErrorEvent.retryable ? '(mozliwe ponowienie)' : '(wymagana interwencja)'}
         </p>
+      )}
+
+      <hr />
+
+      <h2>ML baseline (Faza 6)</h2>
+      <button
+        type="button"
+        onClick={() => {
+          runMlMutation.mutate({
+            channelId,
+            targetMetric: mlTargetMetric,
+            horizonDays: 7,
+          });
+        }}
+        disabled={runMlMutation.isPending}
+        style={{ marginRight: '0.5rem' }}
+      >
+        Uruchom trenowanie ML
+      </button>
+      {runMlMutation.isError && <p>Nie udalo sie uruchomic treningu ML.</p>}
+      {runMlMutation.data && (
+        <p>
+          Trening ML: status={runMlMutation.data.status}, aktywny model={runMlMutation.data.activeModelType ?? 'brak'}, prognozy={formatNumber(runMlMutation.data.predictionsGenerated)}
+        </p>
+      )}
+      {mlForecastQuery.isLoading && <p>Odczyt prognozy ML...</p>}
+      {mlForecastQuery.isError && <p>Nie udalo sie odczytac prognozy ML.</p>}
+      {mlForecast && (
+        <>
+          <p>Model aktywny: {mlForecast.modelType ?? 'Brak aktywnego modelu (quality gate)'}</p>
+          <p>Punkty prognozy: {formatNumber(mlForecast.points.length)}</p>
+          <p>
+            Ostatnia prognoza: {latestForecastPoint ? `${latestForecastPoint.date} -> p10=${formatNumber(Math.round(latestForecastPoint.p10))}, p50=${formatNumber(Math.round(latestForecastPoint.p50))}, p90=${formatNumber(Math.round(latestForecastPoint.p90))}` : 'Brak'}
+          </p>
+        </>
       )}
 
       <hr />

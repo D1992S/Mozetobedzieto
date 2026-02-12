@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@moze/core": "workspace:*",
+    "@moze/ml": "workspace:*",
     "@moze/sync": "workspace:*",
     "@moze/shared": "workspace:*"
   },

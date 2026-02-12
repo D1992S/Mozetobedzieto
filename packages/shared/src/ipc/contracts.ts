@@ -176,6 +176,86 @@ export type SyncCommandResultDTO = z.infer<typeof SyncCommandResultDTOSchema>;
 export const SyncCommandResultSchema = IpcResultSchema(SyncCommandResultDTOSchema);
 export type SyncCommandResult = z.infer<typeof SyncCommandResultSchema>;
 
+export const MlTargetMetricSchema = z.enum(['views', 'subscribers']);
+export type MlTargetMetric = z.infer<typeof MlTargetMetricSchema>;
+
+export const MlModelTypeSchema = z.enum(['holt-winters', 'linear-regression']);
+export type MlModelType = z.infer<typeof MlModelTypeSchema>;
+
+export const MlModelStatusSchema = z.enum(['active', 'shadow', 'rejected', 'insufficient_data']);
+export type MlModelStatus = z.infer<typeof MlModelStatusSchema>;
+
+export const MlRunBaselineInputDTOSchema = z.object({
+  channelId: z.string().min(1),
+  targetMetric: MlTargetMetricSchema.default('views'),
+  horizonDays: z.number().int().min(1).max(90).default(7),
+});
+
+export type MlRunBaselineInputDTO = z.infer<typeof MlRunBaselineInputDTOSchema>;
+
+export const MlModelMetricsDTOSchema = z.object({
+  mae: z.number().nonnegative(),
+  smape: z.number().nonnegative(),
+  mase: z.number().nonnegative(),
+  sampleSize: z.number().int().nonnegative(),
+});
+
+export type MlModelMetricsDTO = z.infer<typeof MlModelMetricsDTOSchema>;
+
+export const MlModelRunSummaryDTOSchema = z.object({
+  modelId: z.number().int().positive(),
+  modelType: MlModelTypeSchema,
+  status: MlModelStatusSchema,
+  metrics: MlModelMetricsDTOSchema,
+});
+
+export type MlModelRunSummaryDTO = z.infer<typeof MlModelRunSummaryDTOSchema>;
+
+export const MlRunBaselineResultDTOSchema = z.object({
+  channelId: z.string(),
+  targetMetric: MlTargetMetricSchema,
+  status: z.enum(['completed', 'insufficient_data']),
+  reason: z.string().nullable(),
+  activeModelType: MlModelTypeSchema.nullable(),
+  trainedAt: z.iso.datetime().nullable(),
+  predictionsGenerated: z.number().int().nonnegative(),
+  models: z.array(MlModelRunSummaryDTOSchema),
+});
+
+export type MlRunBaselineResultDTO = z.infer<typeof MlRunBaselineResultDTOSchema>;
+export const MlRunBaselineResultSchema = IpcResultSchema(MlRunBaselineResultDTOSchema);
+export type MlRunBaselineResult = z.infer<typeof MlRunBaselineResultSchema>;
+
+export const MlForecastQueryInputDTOSchema = z.object({
+  channelId: z.string().min(1),
+  targetMetric: MlTargetMetricSchema.default('views'),
+});
+
+export type MlForecastQueryInputDTO = z.infer<typeof MlForecastQueryInputDTOSchema>;
+
+export const MlForecastPointDTOSchema = z.object({
+  date: z.iso.date(),
+  horizonDays: z.number().int().positive(),
+  predicted: z.number().nonnegative(),
+  p10: z.number().nonnegative(),
+  p50: z.number().nonnegative(),
+  p90: z.number().nonnegative(),
+});
+
+export type MlForecastPointDTO = z.infer<typeof MlForecastPointDTOSchema>;
+
+export const MlForecastResultDTOSchema = z.object({
+  channelId: z.string(),
+  targetMetric: MlTargetMetricSchema,
+  modelType: MlModelTypeSchema.nullable(),
+  trainedAt: z.iso.datetime().nullable(),
+  points: z.array(MlForecastPointDTOSchema),
+});
+
+export type MlForecastResultDTO = z.infer<typeof MlForecastResultDTOSchema>;
+export const MlForecastResultSchema = IpcResultSchema(MlForecastResultDTOSchema);
+export type MlForecastResult = z.infer<typeof MlForecastResultSchema>;
+
 export const IPC_CHANNELS = {
   APP_GET_STATUS: 'app:getStatus',
   APP_GET_DATA_MODE: 'app:getDataMode',
@@ -183,6 +263,8 @@ export const IPC_CHANNELS = {
   APP_PROBE_DATA_MODE: 'app:probeDataMode',
   SYNC_START: 'sync:start',
   SYNC_RESUME: 'sync:resume',
+  ML_RUN_BASELINE: 'ml:runBaseline',
+  ML_GET_FORECAST: 'ml:getForecast',
   DB_GET_KPIS: 'db:getKpis',
   DB_GET_TIMESERIES: 'db:getTimeseries',
   DB_GET_CHANNEL_INFO: 'db:getChannelInfo',

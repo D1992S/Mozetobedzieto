@@ -6,9 +6,11 @@
 
 - Faza 4: **DONE** (minimum pipeline w kodzie).
 - Faza 5: **DONE** (sync orchestrator + checkpoint/resume + retry/backoff + post-sync pipeline).
+- Faza 6: **DONE** (bazowy framework ML + backtesting + quality gate + predictions).
 - Zaimplementowany runner: `packages/data-pipeline/src/pipeline-runner.ts`.
 - Zaimplementowany orchestrator: `packages/sync/src/sync-orchestrator.ts`.
-- Zaimplementowane tabele: `stg_channels`, `stg_videos`, `ml_features`, `data_lineage`.
+- Zaimplementowany baseline ML: `packages/ml/src/ml-baseline.ts`.
+- Zaimplementowane tabele: `stg_channels`, `stg_videos`, `ml_features`, `data_lineage`, `ml_models`, `ml_backtests`, `ml_predictions`.
 
 ## Pełny pipeline
 

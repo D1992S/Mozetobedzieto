@@ -1,6 +1,7 @@
 import { createChannelQueries, createDatabaseConnection, createMetricsQueries, runMigrations, type ChannelQueries, type DatabaseConnection, type MetricsQueries } from '@moze/core';
+import { getLatestMlForecast, runMlBaseline } from '@moze/ml';
 import { createCachedDataProvider, createDataModeManager, createFakeDataProvider, createRateLimitedDataProvider, createRealDataProvider, createRecordingDataProvider, createSyncOrchestrator, type DataModeManager, type SyncOrchestrator } from '@moze/sync';
-import { AppError, IPC_EVENTS, createLogger, err, ok, type AppStatusDTO, type DataModeProbeInputDTO, type DataModeProbeResultDTO, type DataModeStatusDTO, type KpiQueryDTO, type KpiResultDTO, type Result, type SetDataModeInputDTO, type SyncCommandResultDTO, type SyncResumeInputDTO, type SyncStartInputDTO, type TimeseriesQueryDTO, type TimeseriesResultDTO } from '@moze/shared';
+import { AppError, IPC_EVENTS, createLogger, err, ok, type AppStatusDTO, type DataModeProbeInputDTO, type DataModeProbeResultDTO, type DataModeStatusDTO, type KpiQueryDTO, type KpiResultDTO, type MlForecastQueryInputDTO, type MlForecastResultDTO, type MlRunBaselineInputDTO, type MlRunBaselineResultDTO, type Result, type SetDataModeInputDTO, type SyncCommandResultDTO, type SyncResumeInputDTO, type SyncStartInputDTO, type TimeseriesQueryDTO, type TimeseriesResultDTO } from '@moze/shared';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -391,6 +392,33 @@ async function resumeSync(input: SyncResumeInputDTO): Promise<Result<SyncCommand
   return backendState.syncOrchestrator.resumeSync(input);
 }
 
+function runMlBaselineCommand(input: MlRunBaselineInputDTO): Result<MlRunBaselineResultDTO, AppError> {
+  const db = backendState.connection?.db;
+  if (!db) {
+    return err(createDbNotReadyError());
+  }
+
+  return runMlBaseline({
+    db,
+    channelId: input.channelId,
+    targetMetric: input.targetMetric,
+    horizonDays: input.horizonDays,
+  });
+}
+
+function getMlForecastCommand(input: MlForecastQueryInputDTO): Result<MlForecastResultDTO, AppError> {
+  const db = backendState.connection?.db;
+  if (!db) {
+    return err(createDbNotReadyError());
+  }
+
+  return getLatestMlForecast({
+    db,
+    channelId: input.channelId,
+    targetMetric: input.targetMetric,
+  });
+}
+
 const ipcBackend: DesktopIpcBackend = {
   getAppStatus: () => readAppStatus(),
   getDataModeStatus: () => readDataModeStatus(),
@@ -398,6 +426,8 @@ const ipcBackend: DesktopIpcBackend = {
   probeDataMode: (input) => probeDataMode(input),
   startSync: (input) => startSync(input),
   resumeSync: (input) => resumeSync(input),
+  runMlBaseline: (input) => runMlBaselineCommand(input),
+  getMlForecast: (input) => getMlForecastCommand(input),
   getKpis: (query) => readKpis(query),
   getTimeseries: (query) => readTimeseries(query),
   getChannelInfo: (query) => readChannelInfo(query),

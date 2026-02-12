@@ -38,6 +38,9 @@ importers:
       '@moze/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@moze/ml':
+        specifier: workspace:*
+        version: link:../../packages/ml
       '@moze/shared':
         specifier: workspace:*
         version: link:../../packages/shared

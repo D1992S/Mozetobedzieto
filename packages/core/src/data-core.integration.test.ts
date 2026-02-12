@@ -55,6 +55,9 @@ describe('Data Core integration', () => {
       'stg_videos',
       'ml_features',
       'data_lineage',
+      'ml_models',
+      'ml_predictions',
+      'ml_backtests',
     ]) {
       expect(tableNames.has(tableName)).toBe(true);
     }

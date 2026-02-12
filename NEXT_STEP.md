@@ -12,15 +12,16 @@
 | 3 | Data Modes + Fixtures | DONE |
 | 4 | Data Pipeline + Feature Engineering | DONE |
 | 5 | Sync Orchestrator | DONE |
-| 6 | Bazowy ML Framework | **NASTEPNA** |
-| 7-19 | Reszta | Oczekuje |
+| 6 | Bazowy ML Framework | DONE |
+| 7 | Dashboard + Raporty + Eksport | **NASTEPNA** |
+| 8-19 | Reszta | Oczekuje |
 
-## Co zostalo zrobione (Faza 0 + 1 + 2 + 3 + 4 + 5)
+## Co zostalo zrobione (Faza 0 + 1 + 2 + 3 + 4 + 5 + 6)
 
 - Monorepo pnpm workspaces: 10 pakietow + 2 aplikacje.
 - TypeScript 5.9 strict, ESLint 9, Prettier, Vitest 4.
 - Pakiet `shared`:
-  - `Result<T,E>`, `AppError`, IPC kontrakty (4 komendy + 3 eventy), Zod 4 schemas.
+  - `Result<T,E>`, `AppError`, IPC kontrakty (status/data-mode/sync/ml + eventy sync), Zod 4 schemas.
   - Typed IPC result envelopes (`IpcResult`) dla wszystkich komend.
   - Logger JSON (`createLogger`) z poziomami severity i kontekstem.
 - Pakiet `core`:
@@ -97,60 +98,81 @@
   - UI:
     - sekcja "Sync orchestrator (Faza 5)" z przyciskami uruchomienia/wznowienia sync,
     - podglad postepu i bledow na zywo (eventy IPC).
+- `ml` + `core` + `shared` + `desktop` + `ui` (Faza 6):
+  - Migracja `003-ml-framework-schema`:
+    - `ml_models`
+    - `ml_backtests`
+    - `ml_predictions`
+  - Pakiet `ml`:
+    - `runMlBaseline()` z baseline modelami:
+      - `holt-winters` (double exponential smoothing),
+      - `linear-regression`,
+    - rolling backtesting i metryki:
+      - `MAE`, `sMAPE`, `MASE`,
+    - quality gate + statusy modelu:
+      - `active`, `shadow`, `rejected`,
+    - confidence intervals:
+      - `p10`, `p50`, `p90`,
+    - graceful degradation:
+      - status `insufficient_data` przy historii < 30 dni,
+    - odczyt prognozy aktywnego modelu:
+      - `getLatestMlForecast()`.
+  - Kontrakty IPC ML:
+    - `ml:runBaseline`
+    - `ml:getForecast`
+  - Desktop runtime:
+    - handlery IPC dla treningu i odczytu prognoz ML.
+  - UI:
+    - sekcja "ML baseline (Faza 6)" z uruchomieniem treningu i podgladem predykcji.
 - Testy:
-  - 53 testy pass:
+  - 60 testow pass:
     - integracyjne IPC (w tym nowe handlery data mode),
     - integracyjne sync data modes (fake/real/record, rate limit, cache TTL),
     - integracyjne data-pipeline (end-to-end, deterministycznosc, validation range, validation freshness),
-    - integracyjne sync orchestratora (happy path + mutex + resume z checkpointu pipeline).
+    - integracyjne sync orchestratora (happy path + mutex + resume z checkpointu pipeline),
+    - integracyjne ML baseline (training + backtesting + quality gate + graceful degradation).
 - Build/runtime:
   - Desktop runtime bundlowany przez `esbuild` (`apps/desktop/scripts/build-desktop.mjs`), co umozliwia runtime import `@moze/core`/`@moze/shared`.
 - Standard regresji: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
 
-## Co robic teraz — Faza 6: Bazowy ML Framework
+## Co robic teraz — Faza 7: Dashboard + Raporty + Eksport
 
-**Cel:** Dzialajacy framework ML z pierwszym modelem prognostycznym.
+**Cel:** Pierwsza duza wartosc biznesowa: dashboard KPI, wykresy z prognoza i raporty eksportowalne.
 
 **Zakres:**
-1. Model registry:
-   - tabela `ml_models` (id, type, version, config, status, metrics).
-2. Training pipeline:
-   - flow: feature selection -> train -> validate -> store.
-3. Backtesting:
-   - rolling window cross-validation.
-4. Metryki i quality gate:
-   - MAE, sMAPE, MASE oraz aktywacja modelu tylko przy metrykach < threshold.
-5. Pierwsze modele:
-   - baseline `Holt-Winters` + `Linear Regression` dla views/subscribers.
-6. Predykcje:
-   - tabela `ml_predictions` + confidence levels p10/p50/p90.
-7. Zachowanie przy malych danych:
-   - < 30 dni danych -> graceful degradation (bez twardych bledow dla UI).
-8. Testy integracyjne:
-   - train/backtest/quality gate/predictions na fixture data.
+1. Dashboard KPI:
+   - karty KPI z delta i trendem.
+2. Wykresy:
+   - timeseries z overlay prognoz (`p10/p50/p90`) z Fazy 6.
+3. Zakres dat:
+   - 7d / 30d / 90d / custom.
+4. Raporty:
+   - pipeline raportu `sync -> pipeline -> ML -> insights -> render`.
+5. Eksport:
+   - lokalny eksport raportow (min. JSON/CSV, opcj. HTML/PDF).
+6. Testy:
+   - integracyjne IPC + testy renderu dashboardu + walidacja eksportu.
 
-**Definition of Done (Faza 6):**
-- [ ] Dziala registry modeli i zapis metadanych treningu.
-- [ ] Trening baseline modeli przechodzi na fixture data.
-- [ ] Backtesting zwraca MAE/sMAPE/MASE per model.
-- [ ] Quality gate blokuje zly model i aktywuje model spelniajacy progi.
-- [ ] `ml_predictions` zapisuje p10/p50/p90.
-- [ ] Graceful degradation dziala dla krotszej historii danych.
-- [ ] Testy integracyjne ML przechodza.
+**Definition of Done (Faza 7):**
+- [ ] Dashboard pokazuje KPI i wykres szeregu czasowego.
+- [ ] Wykres pokazuje predykcje z confidence band (`p10/p50/p90`).
+- [ ] Dziala przelaczanie zakresu dat.
+- [ ] Raport da sie wygenerowac i wyeksportowac lokalnie.
+- [ ] Testy dashboardu/eksportu przechodza.
 - [ ] `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — 0 errors.
 - [ ] Wpis w `CHANGELOG_AI.md`.
 - [ ] Aktualizacja tego pliku (`NEXT_STEP.md`).
 
 **Pliki do modyfikacji/stworzenia:**
 ```
-packages/ml/src/                      — model registry + training + backtesting + predictions
-packages/core/src/                    — migracja tabel ML (`ml_models`, `ml_predictions`, opcj. `ml_backtests`)
-packages/shared/src/                  — DTO/kontrakty IPC dla ML results
-apps/desktop/src/                     — handlery IPC ML
-apps/ui/src/                          — minimalny podglad wynikow baseline modelu
+apps/ui/src/                          — dashboard KPI + wykresy + controls zakresu
+apps/ui/src/hooks/                    — query hooks do danych KPI/timeseries/forecast
+packages/shared/src/                  — DTO/kontrakty IPC dla raportow i eksportu
+apps/desktop/src/                     — handlery IPC raportow/eksportu
+packages/reports/src/                 — generator raportow i serializacja eksportu
 ```
 
-**Szczegoly:** `docs/PLAN_REALIZACJI.md` -> Faza 6.
+**Szczegoly:** `docs/PLAN_REALIZACJI.md` -> Faza 7.
 
 ## Krytyczne zasady (nie pomijaj)
 

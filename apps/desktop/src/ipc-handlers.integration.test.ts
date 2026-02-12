@@ -12,6 +12,8 @@ import { describe, expect, it } from 'vitest';
 import {
   handleAppGetDataMode,
   handleAppProbeDataMode,
+  handleMlGetForecast,
+  handleMlRunBaseline,
   handleSyncResume,
   handleSyncStart,
   handleAppSetDataMode,
@@ -111,6 +113,41 @@ function createTestContext(): TestContext {
         recordsProcessed: 0,
         pipelineFeatures: 90,
       }),
+    runMlBaseline: (input) =>
+      ok({
+        channelId: input.channelId,
+        targetMetric: input.targetMetric,
+        status: 'completed',
+        reason: null,
+        activeModelType: 'holt-winters',
+        trainedAt: '2026-02-12T22:00:00.000Z',
+        predictionsGenerated: input.horizonDays * 2,
+        models: [
+          {
+            modelId: 1,
+            modelType: 'holt-winters',
+            status: 'active',
+            metrics: { mae: 12, smape: 0.1, mase: 1, sampleSize: 40 },
+          },
+          {
+            modelId: 2,
+            modelType: 'linear-regression',
+            status: 'shadow',
+            metrics: { mae: 15, smape: 0.12, mase: 1.1, sampleSize: 40 },
+          },
+        ],
+      }),
+    getMlForecast: (input) =>
+      ok({
+        channelId: input.channelId,
+        targetMetric: input.targetMetric,
+        modelType: 'holt-winters',
+        trainedAt: '2026-02-12T22:00:00.000Z',
+        points: [
+          { date: '2026-02-13', horizonDays: 1, predicted: 100, p10: 90, p50: 100, p90: 110 },
+          { date: '2026-02-14', horizonDays: 2, predicted: 110, p10: 95, p50: 110, p90: 125 },
+        ],
+      }),
     getKpis: (query) => metricsQueries.getKpis(query),
     getTimeseries: (query) => metricsQueries.getTimeseries(query),
     getChannelInfo: (query) => channelQueries.getChannelInfo(query),
@@ -181,6 +218,25 @@ describe('Desktop IPC handlers integration', () => {
       expect(resumeSyncResult.value.syncRunId).toBe(1);
     }
 
+    const mlRunResult = await handleMlRunBaseline(ctx.backend, {
+      channelId: ctx.channelId,
+      targetMetric: 'views',
+      horizonDays: 7,
+    });
+    expect(mlRunResult.ok).toBe(true);
+    if (mlRunResult.ok) {
+      expect(mlRunResult.value.activeModelType).toBe('holt-winters');
+    }
+
+    const mlForecastResult = await handleMlGetForecast(ctx.backend, {
+      channelId: ctx.channelId,
+      targetMetric: 'views',
+    });
+    expect(mlForecastResult.ok).toBe(true);
+    if (mlForecastResult.ok) {
+      expect(mlForecastResult.value.points.length).toBeGreaterThan(0);
+    }
+
     const kpiResult = handleDbGetKpis(ctx.backend, {
       channelId: ctx.channelId,
       dateFrom: ctx.dateFrom,
@@ -249,6 +305,12 @@ describe('Desktop IPC handlers integration', () => {
       expect(invalidSyncStart.error.code).toBe('IPC_INVALID_PAYLOAD');
     }
 
+    const invalidMlRun = await handleMlRunBaseline(ctx.backend, { channelId: ctx.channelId, horizonDays: 0 });
+    expect(invalidMlRun.ok).toBe(false);
+    if (!invalidMlRun.ok) {
+      expect(invalidMlRun.error.code).toBe('IPC_INVALID_PAYLOAD');
+    }
+
     ctx.close();
   });
 
@@ -273,6 +335,8 @@ describe('Desktop IPC handlers integration', () => {
       probeDataMode: (input) => ctx.backend.probeDataMode(input),
       startSync: (input) => ctx.backend.startSync(input),
       resumeSync: (input) => ctx.backend.resumeSync(input),
+      runMlBaseline: (input) => ctx.backend.runMlBaseline(input),
+      getMlForecast: (input) => ctx.backend.getMlForecast(input),
       getKpis: (query) => ctx.backend.getKpis(query),
       getTimeseries: (query) => ctx.backend.getTimeseries(query),
       getChannelInfo: (query) => ctx.backend.getChannelInfo(query),

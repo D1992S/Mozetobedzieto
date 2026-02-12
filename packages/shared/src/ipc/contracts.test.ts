@@ -5,6 +5,11 @@ import {
   DataModeProbeResultDTOSchema,
   DataModeSchema,
   DataModeStatusDTOSchema,
+  MlForecastQueryInputDTOSchema,
+  MlForecastResultDTOSchema,
+  MlRunBaselineInputDTOSchema,
+  MlRunBaselineResultDTOSchema,
+  MlTargetMetricSchema,
   SyncCommandResultDTOSchema,
   SyncResumeInputDTOSchema,
   SyncStartInputDTOSchema,
@@ -199,6 +204,74 @@ describe('IPC Contracts', () => {
     });
   });
 
+  describe('ML DTO', () => {
+    it('applies defaults for ml run baseline input', () => {
+      const parsed = MlRunBaselineInputDTOSchema.parse({
+        channelId: 'UC123',
+      });
+
+      expect(parsed.targetMetric).toBe('views');
+      expect(parsed.horizonDays).toBe(7);
+    });
+
+    it('validates ml run baseline result payload', () => {
+      const parsed = MlRunBaselineResultDTOSchema.parse({
+        channelId: 'UC123',
+        targetMetric: 'views',
+        status: 'completed',
+        reason: null,
+        activeModelType: 'holt-winters',
+        trainedAt: '2026-02-12T22:00:00.000Z',
+        predictionsGenerated: 7,
+        models: [
+          {
+            modelId: 1,
+            modelType: 'holt-winters',
+            status: 'active',
+            metrics: {
+              mae: 12,
+              smape: 0.08,
+              mase: 0.95,
+              sampleSize: 45,
+            },
+          },
+        ],
+      });
+
+      expect(parsed.models[0]?.status).toBe('active');
+    });
+
+    it('validates ml forecast query and result', () => {
+      const query = MlForecastQueryInputDTOSchema.parse({
+        channelId: 'UC123',
+      });
+      expect(query.targetMetric).toBe('views');
+
+      const result = MlForecastResultDTOSchema.parse({
+        channelId: 'UC123',
+        targetMetric: 'views',
+        modelType: 'linear-regression',
+        trainedAt: '2026-02-12T22:00:00.000Z',
+        points: [
+          {
+            date: '2026-02-13',
+            horizonDays: 1,
+            predicted: 100,
+            p10: 90,
+            p50: 100,
+            p90: 110,
+          },
+        ],
+      });
+
+      expect(result.points).toHaveLength(1);
+    });
+
+    it('rejects invalid target metric', () => {
+      expect(() => MlTargetMetricSchema.parse('likes')).toThrow();
+    });
+  });
+
   describe('Channel constants', () => {
     it('IPC_CHANNELS has expected keys', () => {
       expect(IPC_CHANNELS.APP_GET_STATUS).toBe('app:getStatus');
@@ -207,6 +280,8 @@ describe('IPC Contracts', () => {
       expect(IPC_CHANNELS.APP_PROBE_DATA_MODE).toBe('app:probeDataMode');
       expect(IPC_CHANNELS.SYNC_START).toBe('sync:start');
       expect(IPC_CHANNELS.SYNC_RESUME).toBe('sync:resume');
+      expect(IPC_CHANNELS.ML_RUN_BASELINE).toBe('ml:runBaseline');
+      expect(IPC_CHANNELS.ML_GET_FORECAST).toBe('ml:getForecast');
       expect(IPC_CHANNELS.DB_GET_KPIS).toBe('db:getKpis');
       expect(IPC_CHANNELS.DB_GET_TIMESERIES).toBe('db:getTimeseries');
       expect(IPC_CHANNELS.DB_GET_CHANNEL_INFO).toBe('db:getChannelInfo');

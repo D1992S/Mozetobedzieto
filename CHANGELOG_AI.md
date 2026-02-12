@@ -502,3 +502,57 @@ Dziennik zmian wykonywanych przez modele AI.
   - `pnpm build` - PASS.
 - Nastepny krok:
   - Faza 6: Bazowy ML Framework (registry modeli, baseline trening, backtesting i quality gate).
+
+## 2026-02-12 (v16)
+
+- Data: 2026-02-12
+- Autor (model): GPT-5 Codex
+- Zakres plikow:
+  - `packages/core/src/migrations/003-ml-framework-schema.ts`, `packages/core/src/migrations/index.ts`, `packages/core/src/data-core.integration.test.ts`
+  - `packages/ml/src/ml-baseline.ts`, `packages/ml/src/ml-baseline.integration.test.ts`, `packages/ml/src/index.ts`, `packages/ml/package.json`
+  - `packages/shared/src/ipc/contracts.ts`, `packages/shared/src/ipc/contracts.test.ts`, `packages/shared/src/dto/index.ts`, `packages/shared/src/index.ts`
+  - `apps/desktop/src/ipc-handlers.ts`, `apps/desktop/src/ipc-handlers.integration.test.ts`, `apps/desktop/src/preload.ts`, `apps/desktop/src/main.ts`, `apps/desktop/package.json`
+  - `apps/ui/src/lib/electron-api.types.ts`, `apps/ui/src/lib/electron-api.ts`, `apps/ui/src/hooks/use-dashboard-data.ts`, `apps/ui/src/App.tsx`
+  - `README.md`, `NEXT_STEP.md`, `docs/PLAN_REALIZACJI.md`, `docs/architecture/data-flow.md`, `CHANGELOG_AI.md`
+- Co zmieniono:
+  - Domknieto Faze 6 (Bazowy ML Framework) end-to-end.
+  - Dodano migracje `003-ml-framework-schema`:
+    - `ml_models` (registry modeli),
+    - `ml_backtests`,
+    - `ml_predictions` (predictions + confidence levels).
+  - Zaimplementowano pipeline ML w `@moze/ml`:
+    - `runMlBaseline()`:
+      - modele: `holt-winters` (double exponential smoothing) i `linear-regression`,
+      - rolling backtesting,
+      - metryki: `MAE`, `sMAPE`, `MASE`,
+      - quality gate (`active`/`shadow`/`rejected`),
+      - confidence bands `p10/p50/p90`,
+      - graceful degradation dla historii < 30 dni (`insufficient_data`).
+    - `getLatestMlForecast()`:
+      - odczyt prognozy aktywnego modelu.
+  - Dodano IPC kontrakty i handlery ML:
+    - `ml:runBaseline`,
+    - `ml:getForecast`.
+  - UI rozszerzone o sekcje Fazy 6:
+    - uruchamianie treningu baseline,
+    - podglad aktywnego modelu i punktow prognozy.
+  - Dodano testy integracyjne ML:
+    - trening i zapis predictions/backtests,
+    - quality gate z blokada aktywacji przy ostrych progach,
+    - graceful degradation dla zbyt krotkiej historii.
+  - Zaktualizowano dokumentacje statusu:
+    - Faza 6 = DONE,
+    - Faza 7 = NASTEPNA.
+- Dlaczego:
+  - Celem bylo domkniecie warstwy ML baseline, aby dane z pipeline i sync mialy od razu pierwszy, praktyczny forecast oraz fundament pod dashboard z predykcjami.
+- Ryzyko/regresja:
+  - Implementacja `holt-winters` w tej fazie to wariant double exponential smoothing (bez sezonowosci) jako baseline.
+  - Aktywacja modelu zalezy od quality gate; przy slabszych danych aktywny model moze pozostac `null`.
+  - Lokalnie nadal widoczny warning engines (`node >=22`, aktualnie `20.x`), mimo ze checki przechodza.
+- Jak zweryfikowano:
+  - `pnpm lint` - PASS.
+  - `pnpm typecheck` - PASS.
+  - `pnpm test` - PASS (`60/60`, w tym nowe testy ML baseline).
+  - `pnpm build` - PASS.
+- Nastepny krok:
+  - Faza 7: Dashboard + Raporty + Eksport (overlay prognoz ML na wykresach + eksport raportow).

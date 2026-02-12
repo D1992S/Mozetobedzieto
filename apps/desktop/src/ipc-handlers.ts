@@ -15,6 +15,12 @@ import {
   KpiQueryDTOSchema,
   KpiResultDTOSchema,
   KpiResultSchema,
+  MlForecastQueryInputDTOSchema,
+  MlForecastResultDTOSchema,
+  MlForecastResultSchema,
+  MlRunBaselineInputDTOSchema,
+  MlRunBaselineResultDTOSchema,
+  MlRunBaselineResultSchema,
   SyncCommandResultDTOSchema,
   SyncCommandResultSchema,
   SyncResumeInputDTOSchema,
@@ -37,6 +43,12 @@ import {
   type KpiQueryDTO,
   type KpiResult,
   type KpiResultDTO,
+  type MlForecastQueryInputDTO,
+  type MlForecastResult,
+  type MlForecastResultDTO,
+  type MlRunBaselineInputDTO,
+  type MlRunBaselineResult,
+  type MlRunBaselineResultDTO,
   type Result,
   type SyncCommandResult,
   type SyncCommandResultDTO,
@@ -55,6 +67,8 @@ export interface DesktopIpcBackend {
   probeDataMode: (input: DataModeProbeInputDTO) => Result<DataModeProbeResultDTO, AppError>;
   startSync: (input: SyncStartInputDTO) => Result<SyncCommandResultDTO, AppError> | Promise<Result<SyncCommandResultDTO, AppError>>;
   resumeSync: (input: SyncResumeInputDTO) => Result<SyncCommandResultDTO, AppError> | Promise<Result<SyncCommandResultDTO, AppError>>;
+  runMlBaseline: (input: MlRunBaselineInputDTO) => Result<MlRunBaselineResultDTO, AppError> | Promise<Result<MlRunBaselineResultDTO, AppError>>;
+  getMlForecast: (input: MlForecastQueryInputDTO) => Result<MlForecastResultDTO, AppError> | Promise<Result<MlForecastResultDTO, AppError>>;
   getKpis: (query: KpiQueryDTO) => Result<KpiResultDTO, AppError>;
   getTimeseries: (query: TimeseriesQueryDTO) => Result<TimeseriesResultDTO, AppError>;
   getChannelInfo: (query: { channelId: string }) => Result<ChannelInfoDTO, AppError>;
@@ -248,6 +262,32 @@ export async function handleSyncResume(
   );
 }
 
+export async function handleMlRunBaseline(
+  backend: DesktopIpcBackend,
+  payload: unknown,
+): Promise<MlRunBaselineResult> {
+  return runHandlerAsync(
+    payload,
+    MlRunBaselineInputDTOSchema,
+    MlRunBaselineResultDTOSchema,
+    MlRunBaselineResultSchema,
+    (input) => backend.runMlBaseline(input),
+  );
+}
+
+export async function handleMlGetForecast(
+  backend: DesktopIpcBackend,
+  payload: unknown,
+): Promise<MlForecastResult> {
+  return runHandlerAsync(
+    payload,
+    MlForecastQueryInputDTOSchema,
+    MlForecastResultDTOSchema,
+    MlForecastResultSchema,
+    (input) => backend.getMlForecast(input),
+  );
+}
+
 export function handleDbGetKpis(backend: DesktopIpcBackend, payload: unknown): KpiResult {
   return runHandler(
     payload,
@@ -285,6 +325,8 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, backend: DesktopIpcBac
   ipcMain.handle(IPC_CHANNELS.APP_PROBE_DATA_MODE, (_event, payload) => handleAppProbeDataMode(backend, payload));
   ipcMain.handle(IPC_CHANNELS.SYNC_START, (_event, payload) => handleSyncStart(backend, payload));
   ipcMain.handle(IPC_CHANNELS.SYNC_RESUME, (_event, payload) => handleSyncResume(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.ML_RUN_BASELINE, (_event, payload) => handleMlRunBaseline(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.ML_GET_FORECAST, (_event, payload) => handleMlGetForecast(backend, payload));
   ipcMain.handle(IPC_CHANNELS.DB_GET_KPIS, (_event, payload) => handleDbGetKpis(backend, payload));
   ipcMain.handle(IPC_CHANNELS.DB_GET_TIMESERIES, (_event, payload) => handleDbGetTimeseries(backend, payload));
   ipcMain.handle(IPC_CHANNELS.DB_GET_CHANNEL_INFO, (_event, payload) => handleDbGetChannelInfo(backend, payload));

@@ -9,6 +9,10 @@ import type {
   IpcResult,
   KpiQueryDTO,
   KpiResultDTO,
+  MlForecastQueryInputDTO,
+  MlForecastResultDTO,
+  MlRunBaselineInputDTO,
+  MlRunBaselineResultDTO,
   SyncCommandResultDTO,
   SyncResumeInputDTO,
   SyncStartInputDTO,
@@ -67,6 +71,18 @@ export async function startSync(input: SyncStartInputDTO): Promise<SyncCommandRe
 export async function resumeSync(input: SyncResumeInputDTO): Promise<SyncCommandResultDTO> {
   const api = ensureElectronApi();
   const result = await api.syncResume(input);
+  return unwrapResult(result);
+}
+
+export async function runMlBaseline(input: MlRunBaselineInputDTO): Promise<MlRunBaselineResultDTO> {
+  const api = ensureElectronApi();
+  const result = await api.mlRunBaseline(input);
+  return unwrapResult(result);
+}
+
+export async function fetchMlForecast(input: MlForecastQueryInputDTO): Promise<MlForecastResultDTO> {
+  const api = ensureElectronApi();
+  const result = await api.mlGetForecast(input);
   return unwrapResult(result);
 }
 

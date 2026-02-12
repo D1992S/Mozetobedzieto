@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DataMode } from '@moze/shared';
-import { fetchAppStatus, fetchChannelInfo, fetchDataModeStatus, fetchKpis, fetchTimeseries, probeDataMode, resumeSync, setDataMode, startSync } from '../lib/electron-api.ts';
+import type { DataMode, MlTargetMetric } from '@moze/shared';
+import { fetchAppStatus, fetchChannelInfo, fetchDataModeStatus, fetchKpis, fetchMlForecast, fetchTimeseries, probeDataMode, resumeSync, runMlBaseline, setDataMode, startSync } from '../lib/electron-api.ts';
 
 export const DEFAULT_CHANNEL_ID = 'UC-SEED-PL-001';
 
@@ -80,6 +80,31 @@ export function useResumeSyncMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['app'] });
       void queryClient.invalidateQueries({ queryKey: ['db'] });
+    },
+  });
+}
+
+export function useMlForecastQuery(channelId: string, targetMetric: MlTargetMetric, enabled: boolean) {
+  return useQuery({
+    queryKey: ['ml', 'forecast', channelId, targetMetric],
+    queryFn: () =>
+      fetchMlForecast({
+        channelId,
+        targetMetric,
+      }),
+    enabled,
+    staleTime: 15_000,
+  });
+}
+
+export function useRunMlBaselineMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { channelId: string; targetMetric: MlTargetMetric; horizonDays: number }) =>
+      runMlBaseline(input),
+    onSuccess: (_result, input) => {
+      void queryClient.invalidateQueries({ queryKey: ['ml', 'forecast', input.channelId, input.targetMetric] });
+      void queryClient.invalidateQueries({ queryKey: ['db', 'timeseries', input.channelId] });
     },
   });
 }
