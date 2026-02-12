@@ -1,5 +1,6 @@
 import { createChannelQueries, createDatabaseConnection, createMetricsQueries, runMigrations, type ChannelQueries, type DatabaseConnection, type MetricsQueries } from '@moze/core';
-import { AppError, createLogger, err, ok, type AppStatusDTO, type KpiQueryDTO, type KpiResultDTO, type Result, type TimeseriesQueryDTO, type TimeseriesResultDTO } from '@moze/shared';
+import { createCachedDataProvider, createDataModeManager, createFakeDataProvider, createRateLimitedDataProvider, createRealDataProvider, createRecordingDataProvider, type DataModeManager } from '@moze/sync';
+import { AppError, createLogger, err, ok, type AppStatusDTO, type DataModeProbeInputDTO, type DataModeProbeResultDTO, type DataModeStatusDTO, type KpiQueryDTO, type KpiResultDTO, type Result, type SetDataModeInputDTO, type TimeseriesQueryDTO, type TimeseriesResultDTO } from '@moze/shared';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,12 +12,16 @@ const logger = createLogger({ baseContext: { module: 'desktop-main' } });
 const IS_DEV = process.env.NODE_ENV !== 'production';
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173';
 const UI_ENTRY_PATH = path.join(__dirname, '../../ui/dist/index.html');
+const REPO_ROOT_PATH = path.resolve(__dirname, '../../..');
 const DB_FILENAME = 'mozetobedzieto.sqlite';
+const DEFAULT_FAKE_FIXTURE_PATH = path.join(REPO_ROOT_PATH, 'fixtures', 'seed-data.json');
+const DEFAULT_RECORDING_PATH = path.join(REPO_ROOT_PATH, 'fixtures', 'recordings', 'latest-provider-recording.json');
 
 interface BackendState {
   connection: DatabaseConnection | null;
   metricsQueries: MetricsQueries | null;
   channelQueries: ChannelQueries | null;
+  dataModeManager: DataModeManager | null;
   dbPath: string | null;
 }
 
@@ -24,6 +29,7 @@ const backendState: BackendState = {
   connection: null,
   metricsQueries: null,
   channelQueries: null,
+  dataModeManager: null,
   dbPath: null,
 };
 
@@ -57,6 +63,90 @@ function createDbNotReadyError(): AppError {
   );
 }
 
+function createDataModeNotReadyError(): AppError {
+  return AppError.create(
+    'APP_DATA_MODE_NOT_READY',
+    'Tryb danych nie jest gotowy. Uruchom ponownie aplikacje.',
+    'error',
+    {},
+  );
+}
+
+function resolvePathFromEnv(value: string | undefined, fallbackPath: string): string {
+  if (!value) {
+    return fallbackPath;
+  }
+
+  if (path.isAbsolute(value)) {
+    return value;
+  }
+
+  return path.join(REPO_ROOT_PATH, value);
+}
+
+function initializeDataModes(): Result<DataModeManager, AppError> {
+  const fakeFixturePath = resolvePathFromEnv(process.env.MOZE_FAKE_FIXTURE_PATH, DEFAULT_FAKE_FIXTURE_PATH);
+  const realFixturePath = resolvePathFromEnv(process.env.MOZE_REAL_FIXTURE_PATH, fakeFixturePath);
+  const recordingOutputPath = resolvePathFromEnv(process.env.MOZE_RECORDING_OUTPUT_PATH, DEFAULT_RECORDING_PATH);
+
+  const fakeProviderResult = createFakeDataProvider({ fixturePath: fakeFixturePath });
+  if (!fakeProviderResult.ok) {
+    return err(
+      AppError.create(
+        'SYNC_FAKE_PROVIDER_INIT_FAILED',
+        'Nie udalo sie zainicjalizowac fake provider.',
+        'error',
+        { fakeFixturePath },
+      ),
+    );
+  }
+
+  const realProviderResult = createRealDataProvider({
+    fixturePath: realFixturePath,
+    providerName: 'real-fixture-provider',
+  });
+  if (!realProviderResult.ok) {
+    return err(
+      AppError.create(
+        'SYNC_REAL_PROVIDER_INIT_FAILED',
+        'Nie udalo sie zainicjalizowac real provider.',
+        'error',
+        { realFixturePath },
+      ),
+    );
+  }
+
+  const fakeProvider = createRateLimitedDataProvider(
+    createCachedDataProvider(fakeProviderResult.value),
+    { logger: logger.withContext({ provider: 'fake' }) },
+  );
+  const realProvider = createRateLimitedDataProvider(
+    createCachedDataProvider(realProviderResult.value),
+    { logger: logger.withContext({ provider: 'real' }) },
+  );
+  const recordingProvider = createRecordingDataProvider({
+    provider: realProvider,
+    outputFilePath: recordingOutputPath,
+  });
+
+  const manager = createDataModeManager({
+    initialMode: (process.env.MOZE_DATA_MODE as 'fake' | 'real' | 'record' | undefined) ?? 'fake',
+    fakeProvider,
+    realProvider,
+    recordProvider: recordingProvider,
+    source: 'desktop-runtime',
+  });
+
+  logger.info('Data modes gotowe.', {
+    fakeFixturePath,
+    realFixturePath,
+    recordingOutputPath,
+    mode: manager.getStatus().mode,
+  });
+
+  return ok(manager);
+}
+
 function initializeBackend(): Result<void, AppError> {
   if (backendState.connection) {
     return ok(undefined);
@@ -84,6 +174,19 @@ function initializeBackend(): Result<void, AppError> {
   backendState.channelQueries = createChannelQueries(connectionResult.value.db);
   backendState.dbPath = dbPath;
 
+  const dataModesResult = initializeDataModes();
+  if (!dataModesResult.ok) {
+    const closeResult = connectionResult.value.close();
+    if (!closeResult.ok) {
+      logger.warning('Nie udalo sie zamknac polaczenia DB po bledzie data mode init.', {
+        error: closeResult.error.toDTO(),
+      });
+    }
+    return err(dataModesResult.error);
+  }
+
+  backendState.dataModeManager = dataModesResult.value;
+
   logger.info('Backend gotowy.', {
     dbPath,
     migrationsApplied: migrationResult.value.applied.length,
@@ -106,6 +209,7 @@ function closeBackend(): void {
   backendState.connection = null;
   backendState.metricsQueries = null;
   backendState.channelQueries = null;
+  backendState.dataModeManager = null;
 }
 
 function readAppStatus(): Result<AppStatusDTO, AppError> {
@@ -216,8 +320,32 @@ function readChannelInfo(query: { channelId: string }) {
   return backendState.channelQueries.getChannelInfo(query);
 }
 
+function readDataModeStatus(): Result<DataModeStatusDTO, AppError> {
+  if (!backendState.dataModeManager) {
+    return err(createDataModeNotReadyError());
+  }
+  return ok(backendState.dataModeManager.getStatus());
+}
+
+function setDataMode(input: SetDataModeInputDTO): Result<DataModeStatusDTO, AppError> {
+  if (!backendState.dataModeManager) {
+    return err(createDataModeNotReadyError());
+  }
+  return backendState.dataModeManager.setMode(input);
+}
+
+function probeDataMode(input: DataModeProbeInputDTO): Result<DataModeProbeResultDTO, AppError> {
+  if (!backendState.dataModeManager) {
+    return err(createDataModeNotReadyError());
+  }
+  return backendState.dataModeManager.probe(input);
+}
+
 const ipcBackend: DesktopIpcBackend = {
   getAppStatus: () => readAppStatus(),
+  getDataModeStatus: () => readDataModeStatus(),
+  setDataMode: (input) => setDataMode(input),
+  probeDataMode: (input) => probeDataMode(input),
   getKpis: (query) => readKpis(query),
   getTimeseries: (query) => readTimeseries(query),
   getChannelInfo: (query) => readChannelInfo(query),

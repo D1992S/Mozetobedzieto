@@ -13,6 +13,10 @@ export {
   EmptyPayloadSchema,
   AppStatusResultSchema,
   type AppStatusResult,
+  DataModeStatusResultSchema,
+  type DataModeStatusResult,
+  DataModeProbeResultSchema,
+  type DataModeProbeResult,
   KpiResultSchema,
   type KpiResult,
   TimeseriesResultSchema,
@@ -43,6 +47,16 @@ export {
   ChannelIdDTOSchema,
   type ChannelInfoDTO,
   ChannelInfoDTOSchema,
+  DataModeSchema,
+  type DataMode,
+  DataModeStatusDTOSchema,
+  type DataModeStatusDTO,
+  SetDataModeInputDTOSchema,
+  type SetDataModeInputDTO,
+  DataModeProbeInputDTOSchema,
+  type DataModeProbeInputDTO,
+  DataModeProbeResultDTOSchema,
+  type DataModeProbeResultDTO,
 } from './dto/index.ts';
 
 // Events

@@ -1,4 +1,8 @@
 import type {
+  DataModeProbeInputDTO,
+  DataModeProbeResult,
+  DataModeStatusResult,
+  SetDataModeInputDTO,
   AppStatusResult,
   ChannelIdDTO,
   ChannelInfoResult,
@@ -13,6 +17,9 @@ import type {
 
 export interface ElectronAPI {
   appGetStatus: () => Promise<AppStatusResult>;
+  appGetDataMode: () => Promise<DataModeStatusResult>;
+  appSetDataMode: (input: SetDataModeInputDTO) => Promise<DataModeStatusResult>;
+  appProbeDataMode: (input: DataModeProbeInputDTO) => Promise<DataModeProbeResult>;
   dbGetKpis: (query: KpiQueryDTO) => Promise<KpiResult>;
   dbGetTimeseries: (query: TimeseriesQueryDTO) => Promise<TimeseriesResult>;
   dbGetChannelInfo: (query: ChannelIdDTO) => Promise<ChannelInfoResult>;

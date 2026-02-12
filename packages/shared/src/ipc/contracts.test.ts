@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   AppStatusDTOSchema,
+  DataModeProbeInputDTOSchema,
+  DataModeProbeResultDTOSchema,
+  DataModeSchema,
+  DataModeStatusDTOSchema,
+  SetDataModeInputDTOSchema,
   KpiQueryDTOSchema,
   KpiResultDTOSchema,
   TimeseriesQueryDTOSchema,
@@ -120,9 +125,50 @@ describe('IPC Contracts', () => {
     });
   });
 
+  describe('DataModeDTO', () => {
+    it('validates data mode status', () => {
+      const data = {
+        mode: 'fake' as const,
+        availableModes: ['fake', 'real', 'record'] as const,
+        source: 'desktop-runtime',
+      };
+      expect(DataModeStatusDTOSchema.parse(data)).toEqual(data);
+    });
+
+    it('validates set mode input', () => {
+      const data = { mode: 'real' as const };
+      expect(SetDataModeInputDTOSchema.parse(data)).toEqual(data);
+    });
+
+    it('applies defaults for probe input', () => {
+      const parsed = DataModeProbeInputDTOSchema.parse({ channelId: 'UC123' });
+      expect(parsed.videoIds).toEqual(['VID-001']);
+      expect(parsed.recentLimit).toBe(5);
+    });
+
+    it('validates probe output', () => {
+      const data = {
+        mode: 'record' as const,
+        providerName: 'real-youtube-provider',
+        channelId: 'UC123',
+        recentVideos: 5,
+        videoStats: 2,
+        recordFilePath: 'fixtures/recordings/latest-provider-recording.json',
+      };
+      expect(DataModeProbeResultDTOSchema.parse(data)).toEqual(data);
+    });
+
+    it('rejects invalid data mode', () => {
+      expect(() => DataModeSchema.parse('invalid')).toThrow();
+    });
+  });
+
   describe('Channel constants', () => {
     it('IPC_CHANNELS has expected keys', () => {
       expect(IPC_CHANNELS.APP_GET_STATUS).toBe('app:getStatus');
+      expect(IPC_CHANNELS.APP_GET_DATA_MODE).toBe('app:getDataMode');
+      expect(IPC_CHANNELS.APP_SET_DATA_MODE).toBe('app:setDataMode');
+      expect(IPC_CHANNELS.APP_PROBE_DATA_MODE).toBe('app:probeDataMode');
       expect(IPC_CHANNELS.DB_GET_KPIS).toBe('db:getKpis');
       expect(IPC_CHANNELS.DB_GET_TIMESERIES).toBe('db:getTimeseries');
       expect(IPC_CHANNELS.DB_GET_CHANNEL_INFO).toBe('db:getChannelInfo');

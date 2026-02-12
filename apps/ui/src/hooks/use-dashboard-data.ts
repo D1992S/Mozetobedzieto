@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchAppStatus, fetchChannelInfo, fetchKpis, fetchTimeseries } from '../lib/electron-api.ts';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { DataMode } from '@moze/shared';
+import { fetchAppStatus, fetchChannelInfo, fetchDataModeStatus, fetchKpis, fetchTimeseries, probeDataMode, setDataMode } from '../lib/electron-api.ts';
 
 export const DEFAULT_CHANNEL_ID = 'UC-SEED-PL-001';
 
@@ -30,6 +31,32 @@ export function useAppStatusQuery() {
     queryKey: ['app', 'status'],
     queryFn: () => fetchAppStatus(),
     staleTime: 5_000,
+  });
+}
+
+export function useDataModeStatusQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: ['app', 'data-mode'],
+    queryFn: () => fetchDataModeStatus(),
+    enabled,
+    staleTime: 5_000,
+  });
+}
+
+export function useSetDataModeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mode: DataMode) => setDataMode({ mode }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['app', 'data-mode'] });
+    },
+  });
+}
+
+export function useProbeDataModeMutation() {
+  return useMutation({
+    mutationFn: (input: { channelId: string; videoIds: string[]; recentLimit: number }) =>
+      probeDataMode(input),
   });
 }
 

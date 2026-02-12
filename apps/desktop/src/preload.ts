@@ -1,5 +1,9 @@
 ﻿import {
   AppError,
+  DataModeProbeInputDTOSchema,
+  DataModeProbeResultSchema,
+  DataModeStatusResultSchema,
+  SetDataModeInputDTOSchema,
   AppStatusResultSchema,
   ChannelIdDTOSchema,
   ChannelInfoResultSchema,
@@ -13,6 +17,10 @@
   SyncProgressEventSchema,
   TimeseriesQueryDTOSchema,
   TimeseriesResultSchema,
+  type DataModeProbeInputDTO,
+  type DataModeProbeResult,
+  type DataModeStatusResult,
+  type SetDataModeInputDTO,
   type AppStatusResult,
   type ChannelIdDTO,
   type ChannelInfoResult,
@@ -29,6 +37,9 @@ import type { z } from 'zod/v4';
 
 export interface ElectronAPI {
   appGetStatus: () => Promise<AppStatusResult>;
+  appGetDataMode: () => Promise<DataModeStatusResult>;
+  appSetDataMode: (input: SetDataModeInputDTO) => Promise<DataModeStatusResult>;
+  appProbeDataMode: (input: DataModeProbeInputDTO) => Promise<DataModeProbeResult>;
   dbGetKpis: (query: KpiQueryDTO) => Promise<KpiResult>;
   dbGetTimeseries: (query: TimeseriesQueryDTO) => Promise<TimeseriesResult>;
   dbGetChannelInfo: (query: ChannelIdDTO) => Promise<ChannelInfoResult>;
@@ -116,6 +127,27 @@ const api: ElectronAPI = {
       undefined,
       EmptyPayloadSchema,
       AppStatusResultSchema,
+    ),
+  appGetDataMode: () =>
+    invokeValidated(
+      IPC_CHANNELS.APP_GET_DATA_MODE,
+      undefined,
+      EmptyPayloadSchema,
+      DataModeStatusResultSchema,
+    ),
+  appSetDataMode: (input) =>
+    invokeValidated(
+      IPC_CHANNELS.APP_SET_DATA_MODE,
+      input,
+      SetDataModeInputDTOSchema,
+      DataModeStatusResultSchema,
+    ),
+  appProbeDataMode: (input) =>
+    invokeValidated(
+      IPC_CHANNELS.APP_PROBE_DATA_MODE,
+      input,
+      DataModeProbeInputDTOSchema,
+      DataModeProbeResultSchema,
     ),
   dbGetKpis: (query) =>
     invokeValidated(

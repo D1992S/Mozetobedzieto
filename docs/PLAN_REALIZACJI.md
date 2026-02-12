@@ -831,10 +831,11 @@ Task jest zamknięty **dopiero** gdy:
 - [ ] Pakiet `ml`: model registry + training pipeline stubs.
 - [x] App `desktop`: Electron main + preload (security hardened). ✅ Faza 0
 - [x] App `ui`: React + Zustand + TanStack Query skeleton. ✅ Faza 0
-- [x] Minimal IPC: `app:getStatus`, `db:getKpis`, `db:getTimeseries`. ✅ Faza 2
+- [x] Minimal IPC: `app:getStatus`, `db:getKpis`, `db:getTimeseries` + rozszerzenia `app:getDataMode`, `app:setDataMode`, `app:probeDataMode`. ✅ Faza 2/3
 - [x] Realistyczne fixture data (90 dni, 50 filmów). ✅ Faza 1
-- [ ] Fake mode (runtime toggle + loader fixture).
-- [ ] Pierwszy dashboard na fixture data.
+- [x] Fake mode (runtime toggle + loader fixture). ✅ Faza 3
+- [x] Record mode + replay fixture (real -> fixture -> fake). ✅ Faza 3
+- [x] Pierwszy dashboard na fixture data. ✅ Faza 2/3
 - [x] Dokumenty: `AGENTS.md`, `architecture/overview.md`, `architecture/data-flow.md`. ✅ Faza 0
 - [ ] ADR-001: Wybór stack'u technologicznego.
 

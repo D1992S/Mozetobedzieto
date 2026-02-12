@@ -9,10 +9,11 @@
 | 0 | Foundation | DONE |
 | 1 | Data Core | DONE |
 | 2 | Desktop Backend + IPC | DONE |
-| 3 | Data Modes + Fixtures | **NASTEPNA** |
-| 4-19 | Reszta | Oczekuje |
+| 3 | Data Modes + Fixtures | DONE |
+| 4 | Data Pipeline + Feature Engineering | **NASTEPNA** |
+| 5-19 | Reszta | Oczekuje |
 
-## Co zostalo zrobione (Faza 0 + 1 + 2)
+## Co zostalo zrobione (Faza 0 + 1 + 2 + 3)
 
 - Monorepo pnpm workspaces: 10 pakietow + 2 aplikacje.
 - TypeScript 5.9 strict, ESLint 9, Prettier, Vitest 4.
@@ -36,54 +37,76 @@
   - Typed bridge `window.electronAPI` (metody zamiast surowego `invoke(channel, payload)`).
   - Adapter IPC + hooki TanStack Query pobierajace status/KPI/timeseries/channel info.
   - UI czyta dane analityczne wylacznie przez IPC.
+- `shared` + `data-pipeline` + `sync` + `desktop` + `ui` (Faza 3):
+  - Kontrakty IPC dla data modes:
+    - `app:getDataMode`
+    - `app:setDataMode`
+    - `app:probeDataMode`
+  - Provider interface + tryby danych:
+    - `fake`, `real`, `record`
+    - `DataModeManager` z runtime toggle bez zmiany kontraktow konsumenta.
+  - Provider stack:
+    - fixture loader/save w `packages/data-pipeline/src/provider-fixture.ts`
+    - cache TTL per endpoint
+    - rate limiter (token bucket + log warning przy limicie)
+    - record provider zapisujacy fixture replayowalne w fake mode
+  - Desktop runtime:
+    - inicjalizacja data mode managera przy starcie
+    - env override:
+      - `MOZE_DATA_MODE`
+      - `MOZE_FAKE_FIXTURE_PATH`
+      - `MOZE_REAL_FIXTURE_PATH`
+      - `MOZE_RECORDING_OUTPUT_PATH`
+  - UI:
+    - sekcja "Tryb danych (Faza 3)" z podgladem trybu i przyciskami przełączania/probe.
 - Testy:
-  - 34 testy pass (w tym nowe testy integracyjne IPC: happy path + invalid payload + core error).
+  - 43 testy pass:
+    - integracyjne IPC (w tym nowe handlery data mode),
+    - integracyjne sync data modes (fake/real/record, rate limit, cache TTL).
 - Build/runtime:
   - Desktop runtime bundlowany przez `esbuild` (`apps/desktop/scripts/build-desktop.mjs`), co umozliwia runtime import `@moze/core`/`@moze/shared`.
 - Standard regresji: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
 
-## Co robic teraz — Faza 3: Data Modes + Fixtures
+## Co robic teraz — Faza 4: Data Pipeline + Feature Engineering
 
-**Cel:** Szybka iteracja i powtarzalnosc danych (fake/real/record mode) bez zmian po stronie UI.
+**Cel:** Zbudowac deterministyczny pipeline ETL, ktory przetwarza dane z warstwy RAW do warstwy features pod ML.
 
 **Zakres:**
-1. Fake mode:
-   - fixture loader i instant odpowiedzi providera.
-2. Real mode:
-   - interfejs providera danych (YouTube API jako docelowy adapter).
-3. Record mode:
-   - zapis realnych odpowiedzi API do fixture JSON.
-4. Provider interface (`DataProvider`):
-   - `getChannelStats()`
-   - `getVideoStats()`
-   - `getRecentVideos()`
-5. Cache layer:
-   - TTL per endpoint.
-6. Rate limiter:
-   - token bucket, limity konfigurowalne per provider.
-7. Runtime toggle:
-   - przelaczanie fake/real/record bez zmian komponentow UI.
+1. ETL orchestration:
+   - etapowanie: ingestion -> validation -> staging -> transform -> feature generation.
+2. Validation step:
+   - schema checks (Zod), range checks, freshness checks.
+3. Staging model:
+   - przygotowanie tabel/stubow i mapowan dla danych kanalu/filmow.
+4. Feature engineering:
+   - pierwsze features velocity/engagement/growth/temporal.
+5. Data lineage:
+   - metadata "skad i kiedy" dla rekordow przechodzacych przez pipeline.
+6. Integracja z sync:
+   - gotowy punkt pod post-sync hook (Faza 5), bez lamania kontraktow IPC.
+7. Testy:
+   - testy integracyjne pipeline na `fixtures/seed-data.json`.
 
-**Definition of Done (Faza 3):**
-- [ ] Przelaczanie fake/real dziala bez zmian w UI (env + runtime toggle).
-- [ ] Record mode tworzy dane odtwarzalne w fake mode.
-- [ ] Rate limiter blokuje nadmiar requestow i zostawia log.
-- [ ] Testy integracyjne dla fake/real/record przechodza.
+**Definition of Done (Faza 4):**
+- [ ] Pipeline przetwarza fixture data end-to-end i zapisuje wynik deterministycznie.
+- [ ] Validation odrzuca niepoprawne dane z czytelnym `AppError`.
+- [ ] Powstaja pierwsze features gotowe do dalszego ML.
+- [ ] Data lineage umozliwia audyt pochodzenia danych.
+- [ ] Testy integracyjne dla pipeline przechodza.
 - [ ] `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — 0 errors.
 - [ ] Wpis w `CHANGELOG_AI.md`.
 - [ ] Aktualizacja tego pliku (`NEXT_STEP.md`).
 
 **Pliki do modyfikacji/stworzenia:**
 ```
-packages/sync/src/                    — orchestrator trybow danych + provider interface
-packages/data-pipeline/src/           — fixture loader i normalizacja danych wejsciowych
-packages/shared/src/ipc/contracts.ts  — kontrakty toggle/status trybu danych (jesli potrzebne)
-apps/desktop/src/main.ts              — runtime toggle i podpiecie wybranego providera
-apps/ui/src/                          — UI przełącznika trybu (przez IPC, bez importu z core/sync)
-fixtures/                             — utrzymanie/rozszerzenie golden datasetow dla fake mode
+packages/data-pipeline/src/            — ETL orchestrator + walidacja + transform + features
+packages/core/src/                     — ewentualne tabele pomocnicze/staging/lineage (migracja forward-only)
+packages/sync/src/                     — punkt integracji pod uruchamianie pipeline
+fixtures/                              — fixture data do testow pipeline
+docs/architecture/data-flow.md         — aktualizacja przeplywu po implementacji Fazy 4
 ```
 
-**Szczegoly:** `docs/PLAN_REALIZACJI.md` -> Faza 3.
+**Szczegoly:** `docs/PLAN_REALIZACJI.md` -> Faza 4.
 
 ## Krytyczne zasady (nie pomijaj)
 

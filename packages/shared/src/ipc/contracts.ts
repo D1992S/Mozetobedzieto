@@ -108,8 +108,51 @@ export type ChannelInfoDTO = z.infer<typeof ChannelInfoDTOSchema>;
 export const ChannelInfoResultSchema = IpcResultSchema(ChannelInfoDTOSchema);
 export type ChannelInfoResult = z.infer<typeof ChannelInfoResultSchema>;
 
+export const DataModeSchema = z.enum(['fake', 'real', 'record']);
+export type DataMode = z.infer<typeof DataModeSchema>;
+
+export const DataModeStatusDTOSchema = z.object({
+  mode: DataModeSchema,
+  availableModes: z.array(DataModeSchema).min(1),
+  source: z.string(),
+});
+
+export type DataModeStatusDTO = z.infer<typeof DataModeStatusDTOSchema>;
+export const DataModeStatusResultSchema = IpcResultSchema(DataModeStatusDTOSchema);
+export type DataModeStatusResult = z.infer<typeof DataModeStatusResultSchema>;
+
+export const SetDataModeInputDTOSchema = z.object({
+  mode: DataModeSchema,
+});
+
+export type SetDataModeInputDTO = z.infer<typeof SetDataModeInputDTOSchema>;
+
+export const DataModeProbeInputDTOSchema = z.object({
+  channelId: z.string(),
+  videoIds: z.array(z.string()).min(1).max(20).default(['VID-001']),
+  recentLimit: z.number().int().min(1).max(50).default(5),
+});
+
+export type DataModeProbeInputDTO = z.infer<typeof DataModeProbeInputDTOSchema>;
+
+export const DataModeProbeResultDTOSchema = z.object({
+  mode: DataModeSchema,
+  providerName: z.string(),
+  channelId: z.string(),
+  recentVideos: z.number().int().nonnegative(),
+  videoStats: z.number().int().nonnegative(),
+  recordFilePath: z.string().nullable(),
+});
+
+export type DataModeProbeResultDTO = z.infer<typeof DataModeProbeResultDTOSchema>;
+export const DataModeProbeResultSchema = IpcResultSchema(DataModeProbeResultDTOSchema);
+export type DataModeProbeResult = z.infer<typeof DataModeProbeResultSchema>;
+
 export const IPC_CHANNELS = {
   APP_GET_STATUS: 'app:getStatus',
+  APP_GET_DATA_MODE: 'app:getDataMode',
+  APP_SET_DATA_MODE: 'app:setDataMode',
+  APP_PROBE_DATA_MODE: 'app:probeDataMode',
   DB_GET_KPIS: 'db:getKpis',
   DB_GET_TIMESERIES: 'db:getTimeseries',
   DB_GET_CHANNEL_INFO: 'db:getChannelInfo',

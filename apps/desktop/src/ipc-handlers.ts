@@ -1,5 +1,10 @@
 import {
   AppError,
+  DataModeProbeInputDTOSchema,
+  DataModeProbeResultDTOSchema,
+  DataModeProbeResultSchema,
+  DataModeStatusDTOSchema,
+  DataModeStatusResultSchema,
   AppStatusDTOSchema,
   AppStatusResultSchema,
   ChannelIdDTOSchema,
@@ -10,9 +15,16 @@ import {
   KpiQueryDTOSchema,
   KpiResultDTOSchema,
   KpiResultSchema,
+  SetDataModeInputDTOSchema,
   TimeseriesQueryDTOSchema,
   TimeseriesResultDTOSchema,
   TimeseriesResultSchema,
+  type DataModeProbeInputDTO,
+  type DataModeProbeResult,
+  type DataModeProbeResultDTO,
+  type DataModeStatusDTO,
+  type DataModeStatusResult,
+  type SetDataModeInputDTO,
   type AppStatusDTO,
   type AppStatusResult,
   type ChannelInfoDTO,
@@ -30,6 +42,9 @@ import type { z } from 'zod/v4';
 
 export interface DesktopIpcBackend {
   getAppStatus: () => Result<AppStatusDTO, AppError>;
+  getDataModeStatus: () => Result<DataModeStatusDTO, AppError>;
+  setDataMode: (input: SetDataModeInputDTO) => Result<DataModeStatusDTO, AppError>;
+  probeDataMode: (input: DataModeProbeInputDTO) => Result<DataModeProbeResultDTO, AppError>;
   getKpis: (query: KpiQueryDTO) => Result<KpiResultDTO, AppError>;
   getTimeseries: (query: TimeseriesQueryDTO) => Result<TimeseriesResultDTO, AppError>;
   getChannelInfo: (query: { channelId: string }) => Result<ChannelInfoDTO, AppError>;
@@ -133,6 +148,36 @@ export function handleAppGetStatus(backend: DesktopIpcBackend, payload: unknown)
   );
 }
 
+export function handleAppGetDataMode(backend: DesktopIpcBackend, payload: unknown): DataModeStatusResult {
+  return runHandler(
+    payload,
+    EmptyPayloadSchema,
+    DataModeStatusDTOSchema,
+    DataModeStatusResultSchema,
+    () => backend.getDataModeStatus(),
+  );
+}
+
+export function handleAppSetDataMode(backend: DesktopIpcBackend, payload: unknown): DataModeStatusResult {
+  return runHandler(
+    payload,
+    SetDataModeInputDTOSchema,
+    DataModeStatusDTOSchema,
+    DataModeStatusResultSchema,
+    (input) => backend.setDataMode(input),
+  );
+}
+
+export function handleAppProbeDataMode(backend: DesktopIpcBackend, payload: unknown): DataModeProbeResult {
+  return runHandler(
+    payload,
+    DataModeProbeInputDTOSchema,
+    DataModeProbeResultDTOSchema,
+    DataModeProbeResultSchema,
+    (input) => backend.probeDataMode(input),
+  );
+}
+
 export function handleDbGetKpis(backend: DesktopIpcBackend, payload: unknown): KpiResult {
   return runHandler(
     payload,
@@ -165,6 +210,9 @@ export function handleDbGetChannelInfo(backend: DesktopIpcBackend, payload: unkn
 
 export function registerIpcHandlers(ipcMain: IpcMainLike, backend: DesktopIpcBackend): void {
   ipcMain.handle(IPC_CHANNELS.APP_GET_STATUS, (_event, payload) => handleAppGetStatus(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.APP_GET_DATA_MODE, (_event, payload) => handleAppGetDataMode(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.APP_SET_DATA_MODE, (_event, payload) => handleAppSetDataMode(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.APP_PROBE_DATA_MODE, (_event, payload) => handleAppProbeDataMode(backend, payload));
   ipcMain.handle(IPC_CHANNELS.DB_GET_KPIS, (_event, payload) => handleDbGetKpis(backend, payload));
   ipcMain.handle(IPC_CHANNELS.DB_GET_TIMESERIES, (_event, payload) => handleDbGetTimeseries(backend, payload));
   ipcMain.handle(IPC_CHANNELS.DB_GET_CHANNEL_INFO, (_event, payload) => handleDbGetChannelInfo(backend, payload));

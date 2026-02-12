@@ -1,4 +1,8 @@
 import type {
+  DataModeProbeInputDTO,
+  DataModeProbeResultDTO,
+  DataModeStatusDTO,
+  SetDataModeInputDTO,
   AppStatusDTO,
   ChannelIdDTO,
   ChannelInfoDTO,
@@ -30,6 +34,24 @@ function unwrapResult<T>(result: IpcResult<T>): T {
 export async function fetchAppStatus(): Promise<AppStatusDTO> {
   const api = ensureElectronApi();
   const result = await api.appGetStatus();
+  return unwrapResult(result);
+}
+
+export async function fetchDataModeStatus(): Promise<DataModeStatusDTO> {
+  const api = ensureElectronApi();
+  const result = await api.appGetDataMode();
+  return unwrapResult(result);
+}
+
+export async function setDataMode(input: SetDataModeInputDTO): Promise<DataModeStatusDTO> {
+  const api = ensureElectronApi();
+  const result = await api.appSetDataMode(input);
+  return unwrapResult(result);
+}
+
+export async function probeDataMode(input: DataModeProbeInputDTO): Promise<DataModeProbeResultDTO> {
+  const api = ensureElectronApi();
+  const result = await api.appProbeDataMode(input);
   return unwrapResult(result);
 }
 

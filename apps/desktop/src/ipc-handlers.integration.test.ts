@@ -10,6 +10,9 @@ import {
 import { AppError, err, ok, type AppStatusDTO } from '@moze/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  handleAppGetDataMode,
+  handleAppProbeDataMode,
+  handleAppSetDataMode,
   handleAppGetStatus,
   handleDbGetChannelInfo,
   handleDbGetKpis,
@@ -69,6 +72,27 @@ function createTestContext(): TestContext {
         syncRunning: false,
         lastSyncAt: fixtureResult.value.channel.lastSyncAt ?? null,
       }),
+    getDataModeStatus: () =>
+      ok({
+        mode: 'fake',
+        availableModes: ['fake', 'real', 'record'],
+        source: 'integration-test',
+      }),
+    setDataMode: (input) =>
+      ok({
+        mode: input.mode,
+        availableModes: ['fake', 'real', 'record'],
+        source: 'integration-test',
+      }),
+    probeDataMode: (input) =>
+      ok({
+        mode: 'fake',
+        providerName: 'fake-data-provider',
+        channelId: input.channelId,
+        recentVideos: input.recentLimit,
+        videoStats: input.videoIds.length,
+        recordFilePath: null,
+      }),
     getKpis: (query) => metricsQueries.getKpis(query),
     getTimeseries: (query) => metricsQueries.getTimeseries(query),
     getChannelInfo: (query) => channelQueries.getChannelInfo(query),
@@ -95,6 +119,28 @@ describe('Desktop IPC handlers integration', () => {
     if (!statusResult.ok) {
       ctx.close();
       return;
+    }
+
+    const modeResult = handleAppGetDataMode(ctx.backend, undefined);
+    expect(modeResult.ok).toBe(true);
+    if (modeResult.ok) {
+      expect(modeResult.value.mode).toBe('fake');
+    }
+
+    const setModeResult = handleAppSetDataMode(ctx.backend, { mode: 'record' });
+    expect(setModeResult.ok).toBe(true);
+    if (setModeResult.ok) {
+      expect(setModeResult.value.mode).toBe('record');
+    }
+
+    const probeModeResult = handleAppProbeDataMode(ctx.backend, {
+      channelId: ctx.channelId,
+      videoIds: ['VID-001', 'VID-002'],
+      recentLimit: 5,
+    });
+    expect(probeModeResult.ok).toBe(true);
+    if (probeModeResult.ok) {
+      expect(probeModeResult.value.videoStats).toBe(2);
     }
 
     const kpiResult = handleDbGetKpis(ctx.backend, {
@@ -153,6 +199,12 @@ describe('Desktop IPC handlers integration', () => {
       expect(invalidStatusPayloadResult.error.code).toBe('IPC_INVALID_PAYLOAD');
     }
 
+    const invalidSetMode = handleAppSetDataMode(ctx.backend, { mode: 'invalid' });
+    expect(invalidSetMode.ok).toBe(false);
+    if (!invalidSetMode.ok) {
+      expect(invalidSetMode.error.code).toBe('IPC_INVALID_PAYLOAD');
+    }
+
     ctx.close();
   });
 
@@ -172,6 +224,9 @@ describe('Desktop IPC handlers integration', () => {
 
     const failingBackend: DesktopIpcBackend = {
       getAppStatus: () => err(AppError.create('TEST_BACKEND_FAIL', 'Blad testowy backendu.')),
+      getDataModeStatus: () => ctx.backend.getDataModeStatus(),
+      setDataMode: (input) => ctx.backend.setDataMode(input),
+      probeDataMode: (input) => ctx.backend.probeDataMode(input),
       getKpis: (query) => ctx.backend.getKpis(query),
       getTimeseries: (query) => ctx.backend.getTimeseries(query),
       getChannelInfo: (query) => ctx.backend.getChannelInfo(query),

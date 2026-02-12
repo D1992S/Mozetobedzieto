@@ -41,6 +41,9 @@ importers:
       '@moze/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@moze/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
     devDependencies:
       electron:
         specifier: ^40.4.0

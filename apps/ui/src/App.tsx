@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { DEFAULT_CHANNEL_ID, buildDateRange, useAppStatusQuery, useChannelInfoQuery, useKpisQuery, useTimeseriesQuery } from './hooks/use-dashboard-data.ts';
+import { DEFAULT_CHANNEL_ID, buildDateRange, useAppStatusQuery, useChannelInfoQuery, useDataModeStatusQuery, useKpisQuery, useProbeDataModeMutation, useSetDataModeMutation, useTimeseriesQuery } from './hooks/use-dashboard-data.ts';
 import { useAppStore } from './store/index.ts';
 
 function formatNumber(value: number): string {
@@ -13,6 +13,9 @@ export function App() {
   const channelId = DEFAULT_CHANNEL_ID;
 
   const statusQuery = useAppStatusQuery();
+  const dataModeQuery = useDataModeStatusQuery(isDesktopRuntime);
+  const setModeMutation = useSetDataModeMutation();
+  const probeModeMutation = useProbeDataModeMutation();
   const dataEnabled = isDesktopRuntime && statusQuery.data?.dbReady === true;
   const channelInfoQuery = useChannelInfoQuery(channelId, dataEnabled);
   const kpisQuery = useKpisQuery(channelId, dateRange, dataEnabled);
@@ -50,6 +53,7 @@ export function App() {
   }
 
   const appStatus = statusQuery.data;
+  const modeStatus = dataModeQuery.data;
   const kpis = kpisQuery.data;
   const timeseries = timeseriesQuery.data;
   const latestPoint = timeseries?.points[timeseries.points.length - 1];
@@ -62,6 +66,68 @@ export function App() {
       <p>Aktywny profil: {appStatus.profileId ?? 'Brak'}</p>
       <p>Sync w trakcie: {appStatus.syncRunning ? 'Tak' : 'Nie'}</p>
       <p>Ostatni sync: {appStatus.lastSyncAt ?? 'Brak'}</p>
+
+      <hr />
+
+      <h2>Tryb danych (Faza 3)</h2>
+      {dataModeQuery.isLoading && <p>Odczyt trybu danych...</p>}
+      {dataModeQuery.isError && <p>Nie udalo sie odczytac trybu danych.</p>}
+      {modeStatus && (
+        <>
+          <p>Aktualny tryb: {modeStatus.mode}</p>
+          <p>Dostepne tryby: {modeStatus.availableModes.join(', ')}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setModeMutation.mutate('fake');
+            }}
+            disabled={setModeMutation.isPending}
+            style={{ marginRight: '0.5rem' }}
+          >
+            Ustaw fake
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setModeMutation.mutate('real');
+            }}
+            disabled={setModeMutation.isPending}
+            style={{ marginRight: '0.5rem' }}
+          >
+            Ustaw real
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setModeMutation.mutate('record');
+            }}
+            disabled={setModeMutation.isPending}
+            style={{ marginRight: '0.5rem' }}
+          >
+            Ustaw record
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              probeModeMutation.mutate({
+                channelId,
+                videoIds: ['VID-001', 'VID-002', 'VID-003'],
+                recentLimit: 5,
+              });
+            }}
+            disabled={probeModeMutation.isPending}
+          >
+            Probe trybu danych
+          </button>
+        </>
+      )}
+      {setModeMutation.isError && <p>Nie udalo sie przelaczyc trybu danych.</p>}
+      {probeModeMutation.isError && <p>Probe trybu danych zakonczyl sie bledem.</p>}
+      {probeModeMutation.data && (
+        <p>
+          Probe: provider={probeModeMutation.data.providerName}, recent={probeModeMutation.data.recentVideos}, stats={probeModeMutation.data.videoStats}, plik={probeModeMutation.data.recordFilePath ?? 'brak'}
+        </p>
+      )}
 
       <hr />
 

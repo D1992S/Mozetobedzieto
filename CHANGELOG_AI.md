@@ -312,3 +312,56 @@ Dziennik zmian wykonywanych przez modele AI.
   - `pnpm build` — PASS (w tym `apps/desktop` przez `esbuild`).
 - Następny krok:
   - Faza 3: Data Modes + Fixtures (fake/real/record mode, provider interface, cache TTL, rate limiter, runtime toggle).
+
+## 2026-02-12 (v12)
+
+- Data: 2026-02-12
+- Autor (model): GPT-5 Codex
+- Zakres plikow:
+  - `packages/shared/src/ipc/contracts.ts`, `packages/shared/src/ipc/contracts.test.ts`, `packages/shared/src/dto/index.ts`, `packages/shared/src/index.ts`
+  - `packages/data-pipeline/src/provider-fixture.ts`, `packages/data-pipeline/src/index.ts`
+  - `packages/sync/src/data-provider.ts`, `packages/sync/src/fake-provider.ts`, `packages/sync/src/real-provider.ts`, `packages/sync/src/record-provider.ts`, `packages/sync/src/cache-provider.ts`, `packages/sync/src/rate-limiter.ts`, `packages/sync/src/data-mode-manager.ts`, `packages/sync/src/data-modes.integration.test.ts`, `packages/sync/src/index.ts`
+  - `apps/desktop/src/main.ts`, `apps/desktop/src/ipc-handlers.ts`, `apps/desktop/src/ipc-handlers.integration.test.ts`, `apps/desktop/src/preload.ts`, `apps/desktop/package.json`
+  - `apps/ui/src/lib/electron-api.types.ts`, `apps/ui/src/lib/electron-api.ts`, `apps/ui/src/hooks/use-dashboard-data.ts`, `apps/ui/src/App.tsx`
+  - `README.md`, `NEXT_STEP.md`, `docs/PLAN_REALIZACJI.md`, `CHANGELOG_AI.md`
+  - `pnpm-lock.yaml`
+- Co zmieniono:
+  - Domknieto Faze 3 (Data Modes + Fixtures) end-to-end.
+  - Dodano kontrakty IPC i DTO dla trybow danych:
+    - `app:getDataMode`, `app:setDataMode`, `app:probeDataMode`.
+  - Dodano warstwe fixture provider w `data-pipeline` (load/save provider fixture + fallback do seed fixture).
+  - Dodano pelny stack `sync`:
+    - interfejs `DataProvider`,
+    - provider `fake`,
+    - provider `real` (adapter/fixture fallback),
+    - provider `record` (zapis replayowalnych fixture),
+    - cache TTL per endpoint,
+    - rate limiter token bucket,
+    - `DataModeManager` (runtime toggle + probe).
+  - Podlaczono tryby danych do desktop runtime:
+    - inicjalizacja managera w `main.ts`,
+    - env override (`MOZE_DATA_MODE`, `MOZE_FAKE_FIXTURE_PATH`, `MOZE_REAL_FIXTURE_PATH`, `MOZE_RECORDING_OUTPUT_PATH`),
+    - nowe handlery IPC w `ipc-handlers.ts` i walidacja preload.
+  - UI rozszerzone o sekcje "Tryb danych (Faza 3)" + mutacje/query przez TanStack Query.
+  - Dodano testy integracyjne:
+    - `packages/sync/src/data-modes.integration.test.ts`,
+    - rozszerzenie `apps/desktop/src/ipc-handlers.integration.test.ts`.
+  - Domknieto poprawki jakosciowe po implementacji:
+    - fix lint dla `App.tsx` (`no-confusing-void-expression`),
+    - fix typing cache provider (`TS2322`, usuniecie zbednych generykow),
+    - usuniecie non-null assertions w real provider.
+  - Uaktualniono dokumentacje statusu:
+    - Faza 3 = DONE,
+    - Faza 4 = NASTEPNA.
+- Dlaczego:
+  - Celem bylo wdrozenie szybkich i powtarzalnych trybow pracy na danych (fake/real/record) bez zmiany kontraktu po stronie UI oraz przygotowanie fundamentu pod Faze 4/5.
+- Ryzyko/regresja:
+  - `real` provider jest na razie spiety przez fixture/adapter contract (brak jeszcze produkcyjnego adaptera YouTube API).
+  - Lokalnie pozostaje ostrzezenie engines (`node >=22`, aktualnie `20.x`), mimo ze checki przechodza.
+- Jak zweryfikowano:
+  - `pnpm lint` - PASS.
+  - `pnpm typecheck` - PASS.
+  - `pnpm test` - PASS (`43/43`, w tym nowe integracje sync i IPC data mode).
+  - `pnpm build` - PASS.
+- Nastepny krok:
+  - Faza 4: Data Pipeline + Feature Engineering (ETL orchestration, validation, staging, feature generation, data lineage).
