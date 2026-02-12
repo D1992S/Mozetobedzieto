@@ -1,7 +1,17 @@
 import { z } from 'zod/v4';
-import { AppErrorSchema } from '../errors/app-error.ts';
+import { AppErrorSchema, type AppErrorDTO } from '../errors/app-error.ts';
 
-// ─── Generic IPC Result wrapper ───────────────────────────────────
+export interface IpcOk<T> {
+  ok: true;
+  value: T;
+}
+
+export interface IpcErr {
+  ok: false;
+  error: AppErrorDTO;
+}
+
+export type IpcResult<T> = IpcOk<T> | IpcErr;
 
 export const IpcResultSchema = <T extends z.ZodType>(dataSchema: T) =>
   z.union([
@@ -9,7 +19,7 @@ export const IpcResultSchema = <T extends z.ZodType>(dataSchema: T) =>
     z.object({ ok: z.literal(false), error: AppErrorSchema }),
   ]);
 
-// ─── app:getStatus ────────────────────────────────────────────────
+export const EmptyPayloadSchema = z.undefined();
 
 export const AppStatusDTOSchema = z.object({
   version: z.string(),
@@ -20,8 +30,8 @@ export const AppStatusDTOSchema = z.object({
 });
 
 export type AppStatusDTO = z.infer<typeof AppStatusDTOSchema>;
-
-// ─── db:getKpis ───────────────────────────────────────────────────
+export const AppStatusResultSchema = IpcResultSchema(AppStatusDTOSchema);
+export type AppStatusResult = z.infer<typeof AppStatusResultSchema>;
 
 export const KpiQueryDTOSchema = z.object({
   channelId: z.string(),
@@ -43,8 +53,8 @@ export const KpiResultDTOSchema = z.object({
 });
 
 export type KpiResultDTO = z.infer<typeof KpiResultDTOSchema>;
-
-// ─── db:getTimeseries ─────────────────────────────────────────────
+export const KpiResultSchema = IpcResultSchema(KpiResultDTOSchema);
+export type KpiResult = z.infer<typeof KpiResultSchema>;
 
 export const TimeseriesQueryDTOSchema = z.object({
   channelId: z.string(),
@@ -73,8 +83,8 @@ export const TimeseriesResultDTOSchema = z.object({
 });
 
 export type TimeseriesResultDTO = z.infer<typeof TimeseriesResultDTOSchema>;
-
-// ─── db:getChannelInfo ────────────────────────────────────────────
+export const TimeseriesResultSchema = IpcResultSchema(TimeseriesResultDTOSchema);
+export type TimeseriesResult = z.infer<typeof TimeseriesResultSchema>;
 
 export const ChannelIdDTOSchema = z.object({
   channelId: z.string(),
@@ -95,8 +105,8 @@ export const ChannelInfoDTOSchema = z.object({
 });
 
 export type ChannelInfoDTO = z.infer<typeof ChannelInfoDTOSchema>;
-
-// ─── IPC Channel Registry ─────────────────────────────────────────
+export const ChannelInfoResultSchema = IpcResultSchema(ChannelInfoDTOSchema);
+export type ChannelInfoResult = z.infer<typeof ChannelInfoResultSchema>;
 
 export const IPC_CHANNELS = {
   APP_GET_STATUS: 'app:getStatus',
@@ -106,8 +116,6 @@ export const IPC_CHANNELS = {
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
-
-// ─── IPC Event Registry ───────────────────────────────────────────
 
 export const IPC_EVENTS = {
   SYNC_PROGRESS: 'sync:progress',

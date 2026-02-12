@@ -247,3 +247,68 @@ Dziennik zmian wykonywanych przez modele AI.
   - `pnpm build` — PASS.
 - Następny krok:
   - Faza 2: Desktop Backend + IPC (podłączenie `core` do `apps/desktop`, handlery IPC, adapter UI przez TanStack Query).
+
+## 2026-02-12 (v10)
+
+- Data: 2026-02-12
+- Autor (model): GPT-5 Codex
+- Zakres plików:
+  - `docs/PLAN_REALIZACJI.md`
+  - `NEXT_STEP.md`
+  - `README.md`
+  - `CHANGELOG_AI.md`
+- Co zmieniono:
+  - Uspójniono dokumentację statusu po Fazie 1:
+    - doprecyzowano, że `perf_events` nie wchodziło do zakresu Fazy 1 (pozostaje w Fazie 18),
+    - w checklistcie planu rozdzielono "fixture data" od "fake mode", aby odzwierciedlić aktualny stan repo,
+    - ujednolicono status Fazy 2 na `NASTĘPNA` w `NEXT_STEP.md`,
+    - ujednolicono komendy regresji (`lint + typecheck + test + build`) w `NEXT_STEP.md`,
+    - doprecyzowano komunikat statusu w `README.md`.
+- Dlaczego:
+  - W dokumentacji były niespójności między planem faz a faktycznie zaimplementowanym schema/data core.
+- Ryzyko/regresja:
+  - Brak ryzyka runtime (zmiany wyłącznie dokumentacyjne).
+- Jak zweryfikowano:
+  - Manualny przegląd spójności `README.md` ↔ `NEXT_STEP.md` ↔ `docs/PLAN_REALIZACJI.md`.
+  - Potwierdzono brak rozjazdu z aktualnym kodem `packages/core`.
+- Następny krok:
+  - Implementacja Fazy 2: inicjalizacja DB i handlery IPC w `apps/desktop`, następnie adaptery zapytań IPC po stronie `apps/ui`.
+
+## 2026-02-12 (v11)
+
+- Data: 2026-02-12
+- Autor (model): GPT-5 Codex
+- Zakres plików:
+  - `packages/shared/src/ipc/contracts.ts`, `packages/shared/src/index.ts`
+  - `packages/core/src/queries/channel-queries.ts`, `packages/core/src/queries/index.ts`, `packages/core/src/index.ts`
+  - `apps/desktop/src/main.ts`, `apps/desktop/src/preload.ts`, `apps/desktop/src/ipc-handlers.ts`, `apps/desktop/src/ipc-handlers.integration.test.ts`
+  - `apps/desktop/package.json`, `apps/desktop/scripts/build-desktop.mjs`
+  - `apps/ui/src/env.d.ts`, `apps/ui/src/App.tsx`, `apps/ui/src/store/index.ts`
+  - `apps/ui/src/lib/electron-api.types.ts`, `apps/ui/src/lib/electron-api.ts`, `apps/ui/src/hooks/use-dashboard-data.ts`
+  - `README.md`, `NEXT_STEP.md`, `docs/PLAN_REALIZACJI.md`, `CHANGELOG_AI.md`
+- Co zmieniono:
+  - Zaimplementowano Fazę 2 (Desktop Backend + IPC) end-to-end:
+    - inicjalizacja DB + migracje w `apps/desktop` przy starcie app,
+    - IPC handlery dla `app:getStatus`, `db:getKpis`, `db:getTimeseries`, `db:getChannelInfo`,
+    - walidacja kontraktów Zod po obu stronach granicy IPC (main + preload),
+    - serializacja błędów jako `AppError` bez crashy procesu.
+  - Dodano realny `app:getStatus` oparty o stan DB (aktywny profil, sync status, last sync).
+  - Dodano query `getChannelInfo()` w `@moze/core` i stabilne eksporty w `core/index`.
+  - UI pobiera status/KPI/timeseries/channel info wyłącznie przez `window.electronAPI` + hooki TanStack Query.
+  - Dodano testy integracyjne IPC: happy path, invalid payload, core error.
+  - Usprawniono build desktop runtime:
+    - przejście z `tsc` emit na bundling `esbuild`,
+    - umożliwia runtime użycie `@moze/core`/`@moze/shared` (workspace TS sources).
+  - Zaktualizowano status dokumentacji: Faza 2 = DONE, Faza 3 = NASTĘPNA.
+- Dlaczego:
+  - Celem było domknięcie M1 i uruchomienie bezpiecznego, typowanego mostu UI ↔ backend na działającym Data Core.
+- Ryzyko/regresja:
+  - Desktop build opiera się teraz o bundling `esbuild` (inny pipeline niż wcześniej).
+  - W środowisku lokalnym nadal widoczny warning engines (Node 20 vs wymagane >=22).
+- Jak zweryfikowano:
+  - `pnpm lint` — PASS.
+  - `pnpm typecheck` — PASS.
+  - `pnpm test` — PASS (34/34, w tym IPC integration tests).
+  - `pnpm build` — PASS (w tym `apps/desktop` przez `esbuild`).
+- Następny krok:
+  - Faza 3: Data Modes + Fixtures (fake/real/record mode, provider interface, cache TTL, rate limiter, runtime toggle).

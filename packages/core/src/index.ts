@@ -36,6 +36,10 @@ export {
   createMetricsQueries,
   type MetricsQueries,
 } from './queries/metrics-queries.ts';
+export {
+  createChannelQueries,
+  type ChannelQueries,
+} from './queries/channel-queries.ts';
 
 // Fixtures
 export {

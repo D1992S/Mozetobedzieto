@@ -1,0 +1,52 @@
+import type {
+  AppStatusDTO,
+  ChannelIdDTO,
+  ChannelInfoDTO,
+  IpcResult,
+  KpiQueryDTO,
+  KpiResultDTO,
+  TimeseriesQueryDTO,
+  TimeseriesResultDTO,
+} from '@moze/shared';
+import type { ElectronAPI } from './electron-api.types.ts';
+
+function ensureElectronApi(): ElectronAPI {
+  if (!window.electronAPI) {
+    throw new Error('Brak mostu Electron. Uruchom aplikacje przez desktop runtime.');
+  }
+
+  return window.electronAPI;
+}
+
+function unwrapResult<T>(result: IpcResult<T>): T {
+  if (result.ok) {
+    return result.value;
+  }
+
+  const message = result.error.message;
+  throw new Error(message);
+}
+
+export async function fetchAppStatus(): Promise<AppStatusDTO> {
+  const api = ensureElectronApi();
+  const result = await api.appGetStatus();
+  return unwrapResult(result);
+}
+
+export async function fetchKpis(query: KpiQueryDTO): Promise<KpiResultDTO> {
+  const api = ensureElectronApi();
+  const result = await api.dbGetKpis(query);
+  return unwrapResult(result);
+}
+
+export async function fetchTimeseries(query: TimeseriesQueryDTO): Promise<TimeseriesResultDTO> {
+  const api = ensureElectronApi();
+  const result = await api.dbGetTimeseries(query);
+  return unwrapResult(result);
+}
+
+export async function fetchChannelInfo(query: ChannelIdDTO): Promise<ChannelInfoDTO> {
+  const api = ensureElectronApi();
+  const result = await api.dbGetChannelInfo(query);
+  return unwrapResult(result);
+}

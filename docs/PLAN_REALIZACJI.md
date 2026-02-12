@@ -278,7 +278,8 @@ apps/ui/src/store/index.ts
 - **Raw layer**: `raw_api_responses` (JSON blob + metadata).
 - **Dimension tables**: `dim_channel`, `dim_video`.
 - **Fact tables**: `fact_channel_day`, `fact_video_day`.
-- **Operational tables**: `profiles`, `app_meta`, `sync_runs`, `perf_events`.
+- **Operational tables**: `profiles`, `app_meta`, `sync_runs`.
+- `perf_events` telemetry trafia do zakresu Diagnostics (Faza 18), nie do Fazy 1.
 - Mutation layer: typed repository pattern (nie raw SQL w logice biznesowej).
 - Query layer: `getKpis()`, `getTimeseries()`, typed upserts.
 - Seed fixtures: realistyczne dane 90-dniowe dla 1 kanału + 50 filmów.
@@ -830,8 +831,9 @@ Task jest zamknięty **dopiero** gdy:
 - [ ] Pakiet `ml`: model registry + training pipeline stubs.
 - [x] App `desktop`: Electron main + preload (security hardened). ✅ Faza 0
 - [x] App `ui`: React + Zustand + TanStack Query skeleton. ✅ Faza 0
-- [ ] Minimal IPC: `app:getStatus`, `db:getKpis`, `db:getTimeseries`.
-- [ ] Fake mode + realistyczne fixture data (90 dni, 50 filmów).
+- [x] Minimal IPC: `app:getStatus`, `db:getKpis`, `db:getTimeseries`. ✅ Faza 2
+- [x] Realistyczne fixture data (90 dni, 50 filmów). ✅ Faza 1
+- [ ] Fake mode (runtime toggle + loader fixture).
 - [ ] Pierwszy dashboard na fixture data.
 - [x] Dokumenty: `AGENTS.md`, `architecture/overview.md`, `architecture/data-flow.md`. ✅ Faza 0
 - [ ] ADR-001: Wybór stack'u technologicznego.

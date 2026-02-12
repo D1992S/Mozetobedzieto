@@ -8,14 +8,15 @@
     "dev": "pnpm run build && pnpm run start",
     "start": "electron .",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
-    "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
+    "build": "node scripts/build-desktop.mjs",
+    "build:watch": "node scripts/build-desktop.mjs --watch"
   },
   "dependencies": {
     "@moze/core": "workspace:*",
     "@moze/shared": "workspace:*"
   },
   "devDependencies": {
-    "electron": "^40.4.0"
+    "electron": "^40.4.0",
+    "esbuild": "^0.25.11"
   }
 }

@@ -6,7 +6,19 @@ export { AppError, AppErrorSchema, SEVERITY, type Severity, type AppErrorDTO } f
 
 // IPC Contracts
 export {
+  type IpcResult,
+  type IpcOk,
+  type IpcErr,
   IpcResultSchema,
+  EmptyPayloadSchema,
+  AppStatusResultSchema,
+  type AppStatusResult,
+  KpiResultSchema,
+  type KpiResult,
+  TimeseriesResultSchema,
+  type TimeseriesResult,
+  ChannelInfoResultSchema,
+  type ChannelInfoResult,
   IPC_CHANNELS,
   IPC_EVENTS,
   type IpcChannel,

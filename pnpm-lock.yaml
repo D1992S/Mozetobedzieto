@@ -45,6 +45,9 @@ importers:
       electron:
         specifier: ^40.4.0
         version: 40.4.0
+      esbuild:
+        specifier: ^0.25.11
+        version: 0.25.12
 
   apps/ui:
     dependencies:

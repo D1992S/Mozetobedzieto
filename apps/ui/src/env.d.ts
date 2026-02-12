@@ -1,12 +1,11 @@
 /// <reference types="vite/client" />
 
-interface ElectronAPI {
-  invoke: (channel: string, data?: unknown) => Promise<unknown>;
-  on: (channel: string, callback: (data: unknown) => void) => () => void;
-}
+import type { ElectronAPI } from './lib/electron-api.types.ts';
 
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
   }
 }
+
+export {};

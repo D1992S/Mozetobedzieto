@@ -8,7 +8,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()((set) => ({
-  initialized: true,
+  initialized: false,
   sidebarOpen: true,
   setInitialized: (value) => { set({ initialized: value }); },
   toggleSidebar: () => { set((s) => ({ sidebarOpen: !s.sidebarOpen })); },
