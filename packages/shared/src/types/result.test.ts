@@ -45,7 +45,7 @@ describe('Result type', () => {
     });
 
     it('throws for Err', () => {
-      expect(() => unwrap(err('bad'))).toThrow('Attempted to unwrap an Err');
+      expect(() => unwrap(err('bad'))).toThrow('Próba unwrap na Err');
     });
   });
 });

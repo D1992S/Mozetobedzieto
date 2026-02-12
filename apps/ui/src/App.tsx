@@ -6,8 +6,8 @@ export function App() {
   return (
     <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
       <h1>Mozetobedzieto</h1>
-      <p>AI-first analytics machine for YouTube creators</p>
-      <p>Status: {initialized ? 'Ready' : 'Initializing...'}</p>
+      <p>Analityczna maszyna AI dla twórców YouTube</p>
+      <p>Status: {initialized ? 'Gotowe' : 'Inicjalizacja...'}</p>
     </main>
   );
 }

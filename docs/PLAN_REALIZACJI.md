@@ -49,6 +49,13 @@
    - Brakujące dane: explicite oznaczane (NULL z reason), nie interpolowane cicho.
    - Data lineage: każdy rekord wie skąd pochodzi (source, timestamp, sync_run_id).
 
+9. **Język aplikacji — POLSKI**
+   - Cały interfejs użytkownika (UI) jest **wyłącznie po polsku**: etykiety, komunikaty, placeholdery, tooltips, alerty, raporty, opisy na dashboardzie.
+   - Komunikaty błędów widoczne dla użytkownika — po polsku.
+   - Nazwy zmiennych/funkcji/typów — po angielsku (standard branżowy).
+   - Komentarze w kodzie — po angielsku.
+   - Szczegółowe zasady w `AGENTS.md` sekcja „Język aplikacji".
+
 ---
 
 ## 2. Struktura repo (docelowa)

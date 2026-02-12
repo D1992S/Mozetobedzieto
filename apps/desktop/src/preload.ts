@@ -15,7 +15,7 @@ const api: ElectronAPI = {
     ];
 
     if (!ALLOWED_CHANNELS.includes(channel)) {
-      return Promise.reject(new Error(`IPC channel not allowed: ${channel}`));
+      return Promise.reject(new Error(`Kanał IPC niedozwolony: ${channel}`));
     }
 
     return ipcRenderer.invoke(channel, data);
@@ -29,7 +29,7 @@ const api: ElectronAPI = {
     ];
 
     if (!ALLOWED_EVENTS.includes(channel)) {
-      throw new Error(`IPC event channel not allowed: ${channel}`);
+      throw new Error(`Kanał zdarzeń IPC niedozwolony: ${channel}`);
     }
 
     const handler = (_event: Electron.IpcRendererEvent, data: unknown): void => {

@@ -47,5 +47,5 @@ export function unwrap<T, E>(result: Result<T, E>): T {
   if (result.ok) {
     return result.value;
   }
-  throw new Error(`Attempted to unwrap an Err: ${String(result.error)}`);
+  throw new Error(`Próba unwrap na Err: ${String(result.error)}`);
 }

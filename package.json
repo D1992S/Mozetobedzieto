@@ -2,7 +2,7 @@
   "name": "mozetobedzieto",
   "version": "0.0.1",
   "private": true,
-  "description": "AI-first analytics machine for YouTube content creators",
+  "description": "Analityczna maszyna AI dla twórców YouTube",
   "type": "module",
   "scripts": {
     "build": "pnpm -r run build",

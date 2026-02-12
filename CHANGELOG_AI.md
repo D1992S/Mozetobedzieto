@@ -85,3 +85,22 @@ Dziennik zmian wykonywanych przez modele AI.
   - `pnpm typecheck` — 12/12 pakietów pass.
   - `pnpm test` — 26/26 testów pass.
 - Następny krok: Faza 1 (Data Core) — SQLite setup z better-sqlite3, system migracji, tabele RAW/STAGING/DIM/FACT, warstwa query/mutation w pakiecie `core`.
+
+## 2026-02-12 (v4)
+
+- Data: 2026-02-12
+- Autor (model): Claude Opus 4.6
+- Zakres plików: `AGENTS.md`, `docs/PLAN_REALIZACJI.md`, `apps/ui/src/App.tsx`, `apps/desktop/src/preload.ts`, `packages/shared/src/types/result.ts`, `packages/shared/src/types/result.test.ts`, `package.json`
+- Co zmieniono:
+  - Dodano zasadę #9 w PLAN_REALIZACJI.md: **Język aplikacji — POLSKI**.
+  - Dodano sekcję „Język aplikacji — POLSKI" w AGENTS.md z jasnymi regułami: UI po polsku, komendy błędów widoczne w UI po polsku, kod/zmienne po angielsku, komentarze po angielsku.
+  - Przetłumaczono wszystkie user-facing stringi: App.tsx, preload.ts error messages, Result unwrap message.
+  - Zaktualizowano description w root package.json.
+  - Zaktualizowano test oczekujący polskiego komunikatu błędu.
+- Dlaczego: Wymaganie użytkownika — cała aplikacja ma być po polsku. Musi być jawnie zapisane jako zasada, żeby kolejne AI nie dodawały angielskich stringów.
+- Ryzyko/regresja: Brak (zmiany w stringach + docs, istniejące testy zaktualizowane).
+- Jak zweryfikowano:
+  - `pnpm lint` — 0 errors.
+  - `pnpm typecheck` — 12/12 pass.
+  - `pnpm test` — 26/26 pass.
+- Następny krok: Faza 1 (Data Core) — SQLite setup z better-sqlite3, system migracji, tabele RAW/STAGING/DIM/FACT, warstwa query/mutation w pakiecie `core`. Pamiętaj: wszelkie user-facing komunikaty po polsku.

@@ -34,6 +34,18 @@ apps/ui            → Zależy od: shared (TYLKO). Komunikacja przez IPC.
 - Circular dependencies = błąd krytyczny.
 - Nowa zależność między pakietami wymaga aktualizacji tego pliku.
 
+### Język aplikacji — POLSKI
+
+> **KRYTYCZNE**: Cała aplikacja jest po polsku. To nie jest opcjonalne.
+
+- **UI (cały)**: etykiety, komunikaty, placeholdery, tooltips, alerty, opisy w dashboardzie, raporty — **po polsku**.
+- **Komunikaty błędów widoczne dla użytkownika** (AppError.message w UI, toasty, modale) — **po polsku**.
+- **Komunikaty wewnętrzne** (logi, error codes, stack traces) — po angielsku (standard branżowy).
+- **Nazwy zmiennych/funkcji/typów** — po angielsku (camelCase/PascalCase).
+- **Komentarze w kodzie** — po angielsku.
+- **Dokumentacja techniczna** — po polsku (spójnie z resztą repo).
+- **Testy**: opisy (describe/it) po angielsku, ale testowane stringi UI muszą odpowiadać polskim wersjom.
+
 ### Konwencje kodu
 
 - **TypeScript strict** — zero `any`, zero `as` casts bez uzasadnienia w komentarzu.
