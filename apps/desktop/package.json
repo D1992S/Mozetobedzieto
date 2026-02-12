@@ -16,7 +16,8 @@
     "@moze/ml": "workspace:*",
     "@moze/reports": "workspace:*",
     "@moze/sync": "workspace:*",
-    "@moze/shared": "workspace:*"
+    "@moze/shared": "workspace:*",
+    "better-sqlite3": "^12.6.2"
   },
   "devDependencies": {
     "electron": "^40.4.0",

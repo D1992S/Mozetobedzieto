@@ -601,3 +601,27 @@ Dziennik zmian wykonywanych przez modele AI.
   - `pnpm build` - PASS.
 - Nastepny krok:
   - Faza 8: Auth + Profile + Settings (connect/disconnect/status, multi-profile, settings per profil, safeStorage dla sekretow).
+
+## 2026-02-12 (v18)
+
+- Data: 2026-02-12
+- Autor (model): GPT-5 Codex
+- Zakres plikow:
+  - `apps/desktop/package.json`
+  - `pnpm-lock.yaml`
+  - `CHANGELOG_AI.md`
+- Co zmieniono:
+  - Hotfix uruchamiania `pnpm dev`:
+    - dodano `better-sqlite3` do runtime dependencies `@moze/desktop`.
+  - Powod:
+    - Electron runtime nie mogl znalezc pakietu `better-sqlite3` (`ERR_MODULE_NOT_FOUND`) przy starcie `apps/desktop/dist/main.js`.
+- Dlaczego:
+  - Bez tej zaleznosci aplikacja desktop nie startowala lokalnie mimo poprawnego buildu.
+- Ryzyko/regresja:
+  - Niskie; zmiana tylko w deklaracji dependency + lockfile.
+- Jak zweryfikowano:
+  - `pnpm install` — PASS.
+  - `pnpm dev` — Electron i UI startuja poprawnie.
+  - `http://localhost:5173` — HTTP 200.
+- Nastepny krok:
+  - Kontynuowac Faze 8 zgodnie z `NEXT_STEP.md`.
