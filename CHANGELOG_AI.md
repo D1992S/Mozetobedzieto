@@ -174,3 +174,22 @@ Dziennik zmian wykonywanych przez modele AI.
   - Odczyt `README.md` po zmianie i kontrola, że każda faza ma opis w prostym języku.
 - Następny krok:
   - Kontynuować Fazę 1 (Data Core) zgodnie z `NEXT_STEP.md`.
+
+## 2026-02-12 (v8)
+
+- Data: 2026-02-12
+- Autor (model): GPT-5 Codex
+- Zakres plików: `scripts/dev-desktop.mjs`, `CHANGELOG_AI.md`
+- Co zmieniono:
+  - Naprawiono uruchamianie `pnpm dev` na Windows:
+    - dodano `shell: true` przy `spawn` dla procesu `pnpm`,
+    - ujednolicono adres dev servera na `http://localhost:5173`.
+- Dlaczego:
+  - `pnpm dev` kończyło się błędem `spawn EINVAL` i miało potencjalny rozjazd adresów (`127.0.0.1` vs `::1`).
+- Ryzyko/regresja:
+  - Niskie; zmiana dotyczy tylko lokalnego skryptu developerskiego.
+- Jak zweryfikowano:
+  - `pnpm dev` startuje poprawnie (UI + Electron).
+  - `http://localhost:5173` zwraca poprawny HTML.
+- Następny krok:
+  - Kontynuować Fazę 1 (Data Core) zgodnie z `NEXT_STEP.md`.
