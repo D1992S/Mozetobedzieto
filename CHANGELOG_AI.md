@@ -193,3 +193,57 @@ Dziennik zmian wykonywanych przez modele AI.
   - `http://localhost:5173` zwraca poprawny HTML.
 - Następny krok:
   - Kontynuować Fazę 1 (Data Core) zgodnie z `NEXT_STEP.md`.
+
+## 2026-02-12 (v9)
+
+- Data: 2026-02-12
+- Autor (model): GPT-5 Codex
+- Zakres plików:
+  - `packages/core/package.json`
+  - `packages/core/src/index.ts`
+  - `packages/core/src/database.ts`
+  - `packages/core/src/migrations/types.ts`
+  - `packages/core/src/migrations/001-initial-schema.ts`
+  - `packages/core/src/migrations/index.ts`
+  - `packages/core/src/repositories/types.ts`
+  - `packages/core/src/repositories/core-repository.ts`
+  - `packages/core/src/repositories/index.ts`
+  - `packages/core/src/queries/metrics-queries.ts`
+  - `packages/core/src/queries/index.ts`
+  - `packages/core/src/fixtures/types.ts`
+  - `packages/core/src/fixtures/index.ts`
+  - `packages/core/src/data-core.integration.test.ts`
+  - `fixtures/seed-data.json`
+  - `pnpm-workspace.yaml`
+  - `pnpm-lock.yaml`
+  - `README.md`
+  - `docs/PLAN_REALIZACJI.md`
+  - `NEXT_STEP.md`
+  - `CHANGELOG_AI.md`
+- Co zmieniono:
+  - Zaimplementowano Fazę 1 (Data Core) w `packages/core`:
+    - SQLite connection manager (`better-sqlite3`) z `Result<T, AppError>`.
+    - System migracji forward-only z trackingiem (`schema_migrations`) i migracją `001-initial-schema`.
+    - Tabele warstw: RAW/Operational/Dimension/Fact zgodnie z planem fazy.
+    - Typed repository/mutation layer (upserts + operacje sync/raw).
+    - Query layer: `getKpis()` i `getTimeseries()` z deterministycznym `ORDER BY`.
+    - Moduł fixture: odczyt `fixtures/seed-data.json` oraz seedowanie bazy.
+  - Dodano integracyjne testy DB (in-memory SQLite):
+    - idempotentność migracji,
+    - seed fixture i odczyt KPI/timeseries.
+  - Dodano realistyczny fixture: 90 dni danych, 1 kanał, 50 filmów.
+  - Uzupełniono `pnpm-workspace.yaml` o `better-sqlite3` w `onlyBuiltDependencies`, aby build native działał lokalnie/CI.
+  - Zaktualizowano statusy dokumentacji: Faza 1 = DONE, Faza 2 = następna.
+- Dlaczego:
+  - Celem było domknięcie Fazy 1 zgodnie z DoD i przygotowanie stabilnej warstwy danych pod IPC/backend w Fazie 2.
+- Ryzyko/regresja:
+  - `better-sqlite3` jest natywnym modułem i wymaga build/prebuild dla lokalnego środowiska.
+  - Lokalnie nadal jest ostrzeżenie engines (`node >=22` wymagane, aktualnie `20.x`), ale walidacja projektu przechodzi.
+- Jak zweryfikowano:
+  - `pnpm install --force` (w tym build `better-sqlite3`).
+  - `pnpm lint` — PASS.
+  - `pnpm typecheck` — PASS.
+  - `pnpm test` — PASS (`31/31`, w tym testy integracyjne Data Core).
+  - `pnpm build` — PASS.
+- Następny krok:
+  - Faza 2: Desktop Backend + IPC (podłączenie `core` do `apps/desktop`, handlery IPC, adapter UI przez TanStack Query).

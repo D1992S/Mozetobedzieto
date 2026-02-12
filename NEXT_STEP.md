@@ -7,11 +7,11 @@
 | Faza | Nazwa | Status |
 |------|-------|--------|
 | 0 | Foundation | DONE |
-| 1 | Data Core | **DO ZROBIENIA** |
-| 2 | Desktop Backend + IPC | Oczekuje |
+| 1 | Data Core | DONE |
+| 2 | Desktop Backend + IPC | **DO ZROBIENIA** |
 | 3–19 | Reszta | Oczekuje |
 
-## Co zostało zrobione (Faza 0)
+## Co zostało zrobione (Faza 0 + 1)
 
 - Monorepo pnpm workspaces: 10 pakietów + 2 aplikacje.
 - TypeScript 5.9 strict, ESLint 9, Prettier, Vitest 4.
@@ -20,48 +20,54 @@
 - Electron shell z security hardening (contextIsolation, sandbox).
 - Dopracowany dev/build dla desktopa: runtime build do `dist` + skrypt `pnpm dev` uruchamiający UI i Electron.
 - React 19 + Zustand 5 + TanStack Query 5 skeleton.
-- 29 testów unit (w tym logger) — wszystkie pass.
+- Data Core (`packages/core`):
+  - `better-sqlite3` + `@types/better-sqlite3`.
+  - Connection manager SQLite (`database.ts`).
+  - System migracji forward-only + tracking (`schema_migrations`).
+  - Initial schema: `raw_api_responses`, `profiles`, `app_meta`, `sync_runs`, `dim_channel`, `dim_video`, `fact_channel_day`, `fact_video_day`.
+  - Typed repository/mutation layer (upserts i zapisy operacyjne).
+  - Query layer: `getKpis()`, `getTimeseries()` z jawnych `ORDER BY`.
+  - Fixture seed: `fixtures/seed-data.json` (90 dni, 1 kanał, 50 filmów).
+  - Testy integracyjne in-memory SQLite (idempotentne migracje, seed + odczyt KPI/timeseries).
+- 31 testów (unit + integration) — wszystkie pass.
 - CI pipeline (`.github/workflows/ci.yml`): lint + typecheck + test + build.
 - Standard regresji: `pnpm lint && pnpm typecheck && pnpm test` (egzekwowane również w CI).
 
-## Co robić teraz — Faza 1: Data Core
+## Co robić teraz — Faza 2: Desktop Backend + IPC
 
-**Cel:** Stabilny fundament danych z warstwowym modelem.
+**Cel:** Bezpieczny i typowany most UI ↔ backend na działającym Data Core.
 
 **Zakres:**
-1. Zainstaluj `better-sqlite3` + `@types/better-sqlite3` w `packages/core`.
-2. Stwórz system migracji (forward-only, numbered, idempotent).
-3. Stwórz tabele:
-   - **RAW**: `raw_api_responses` (JSON blob + metadata).
-   - **Operational**: `profiles`, `app_meta`, `sync_runs`.
-   - **Dimension**: `dim_channel`, `dim_video`.
-   - **Fact**: `fact_channel_day`, `fact_video_day`.
-4. Stwórz mutation layer (typed repository pattern — nie raw SQL w logice).
-5. Stwórz query layer: `getKpis()`, `getTimeseries()`, typed upserts.
-6. Seed fixtures: realistyczne dane 90 dni, 1 kanał, 50 filmów.
-7. Testy integracyjne DB (in-memory SQLite).
+1. Podłącz `packages/core` do procesu main w `apps/desktop` (inicjalizacja DB + migracje przy starcie app).
+2. Dodaj IPC router/registry dla komend:
+   - `app:getStatus`
+   - `db:getKpis`
+   - `db:getTimeseries`
+   - `db:getChannelInfo`
+3. Waliduj input/output przez kontrakty z `@moze/shared` po obu stronach granicy IPC.
+4. Ujednolić obsługę błędów: `Result<T, AppError>` + serializacja przez IPC bez crashy.
+5. Dodać adapter po stronie UI (TanStack Query hooks korzystające wyłącznie z `window.electronAPI`).
+6. Dodać testy integracyjne IPC (happy path + invalid payload + błąd z core).
 
-**Definition of Done (Faza 1):**
-- [ ] Testy integracyjne DB przechodzą (in-memory SQLite).
-- [ ] Fixture zapisuje się i odczytuje poprawnie.
-- [ ] Migracje są idempotentne (podwójne uruchomienie = brak błędu).
-- [ ] Query results deterministyczne (jawne ORDER BY wszędzie).
+**Definition of Done (Faza 2):**
+- [ ] UI pobiera KPI/timeseries wyłącznie przez IPC.
+- [ ] Invalid input zwraca `AppError` (bez crash).
+- [ ] Jest działający `app:getStatus` spięty z realnym stanem DB.
+- [ ] Testy integracyjne IPC przechodzą.
 - [ ] `pnpm lint && pnpm typecheck && pnpm test` — 0 errors.
 - [ ] Wpis w `CHANGELOG_AI.md`.
 - [ ] Aktualizacja tego pliku (`NEXT_STEP.md`).
 
 **Pliki do modyfikacji/stworzenia:**
 ```
-packages/core/src/index.ts          — eksporty
-packages/core/src/database.ts       — SQLite connection manager
-packages/core/src/migrations/       — system migracji
-packages/core/src/migrations/001-initial-schema.ts
-packages/core/src/repositories/     — typed repository pattern
-packages/core/src/queries/          — query layer
-fixtures/seed-data.json             — 90-dniowe dane testowe
+apps/desktop/src/main.ts            — inicjalizacja DB + IPC handlery
+apps/desktop/src/preload.ts         — typed bridge, allowlist kanałów/eventów
+apps/ui/src/                        — query hooks + konsumowanie IPC
+packages/shared/src/ipc/contracts.ts — kontrakty wejścia/wyjścia (jeśli wymagają doprecyzowania)
+packages/core/src/index.ts          — stabilne eksporty API dla desktop backend
 ```
 
-**Szczegóły:** `docs/PLAN_REALIZACJI.md` → Faza 1, sekcja 4 (Architektura danych).
+**Szczegóły:** `docs/PLAN_REALIZACJI.md` → Faza 2.
 
 ## Krytyczne zasady (nie pomijaj!)
 

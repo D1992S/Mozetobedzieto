@@ -4,13 +4,13 @@ Analityczna maszyna dla content creatorów (YouTube) — desktop app (Electron),
 
 ## Postęp realizacji
 
-> Aktualny status: **Faza 0 ukończona.** Szczegóły: [`NEXT_STEP.md`](NEXT_STEP.md)
+> Aktualny status: **Faza 1 ukończona.** Szczegóły: [`NEXT_STEP.md`](NEXT_STEP.md)
 
 | Faza | Nazwa | Status | Co powinno działać (prosty opis) |
 |------|-------|--------|-----------------------------------|
 | 0 | Foundation (monorepo, TS, Electron, shared) | DONE | Aplikacja się uruchamia: jest okno desktop, podstawowy ekran i fundament techniczny. |
-| 1 | Data Core (SQLite, migracje, query layer) | **NASTĘPNA** | Aplikacja ma stabilną bazę danych i potrafi zapisywać/odczytywać podstawowe dane kanału i filmów. |
-| 2 | Desktop Backend + IPC | — | Interfejs zaczyna bezpiecznie rozmawiać z backendem i pokazuje dane z bazy. |
+| 1 | Data Core (SQLite, migracje, query layer) | DONE | Aplikacja ma stabilną bazę danych i potrafi zapisywać/odczytywać podstawowe dane kanału i filmów. |
+| 2 | Desktop Backend + IPC | **NASTĘPNA** | Interfejs zaczyna bezpiecznie rozmawiać z backendem i pokazuje dane z bazy. |
 | 3 | Data Modes + Fixtures | — | Można pracować na danych testowych albo prawdziwych i przełączać tryb pracy. |
 | 4 | Data Pipeline + Feature Engineering | — | Dane są automatycznie czyszczone i przeliczane na metryki do analiz i ML. |
 | 5 | Sync Orchestrator | — | Jest kontrolowany sync z postępem, retry i możliwością wznowienia po przerwaniu. |

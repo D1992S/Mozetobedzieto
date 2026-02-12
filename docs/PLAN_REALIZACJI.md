@@ -825,7 +825,7 @@ Task jest zamknięty **dopiero** gdy:
 - [x] Skonfigurować TS strict + ESLint flat config + Prettier + Vitest. ✅ Faza 0
 - [x] CI pipeline (GitHub Actions): lint + typecheck + test. ✅ Faza 0
 - [x] Pakiet `shared`: DTO, Zod schemas, AppError, events, IPC contracts. ✅ Faza 0
-- [ ] Pakiet `core`: SQLite + migracje + query/mutation layer.
+- [x] Pakiet `core`: SQLite + migracje + query/mutation layer. ✅ Faza 1
 - [ ] Pakiet `data-pipeline`: ETL skeleton + feature engineering stubs.
 - [ ] Pakiet `ml`: model registry + training pipeline stubs.
 - [x] App `desktop`: Electron main + preload (security hardened). ✅ Faza 0
