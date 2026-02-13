@@ -771,3 +771,31 @@ Dziennik zmian wykonywanych przez modele AI.
   - `corepack pnpm build` - PASS.
 - Nastepny krok:
   - Uzytkownik wykonuje testy wedlug sekcji 0 i raportuje wynik szablonem z runbooka; po zamknieciu P0/P1 rozpoczynamy Faze 9.
+
+## 2026-02-13 (v23)
+
+- Data: 2026-02-13
+- Autor (model): GPT-5.2-Codex
+- Zakres plikow:
+  - `docs/runbooks/test-plan-faza-0-8.md`
+  - `README.md`
+  - `NEXT_STEP.md`
+  - `docs/PLAN_REALIZACJI.md`
+  - `CHANGELOG_AI.md`
+- Co zmieniono:
+  - Przepisano runbook testow funkcjonalnych Faz 0-8 na wersje ultra-prosta dla osob nietechnicznych.
+  - Uproszczono instrukcje do krotkiej listy krokow, dodano jasna regule GO/NO-GO i skrocony szablon raportu.
+  - Zaktualizowano README (opis runbooka), NEXT_STEP (stan sesji) oraz checklistę w PLAN_REALIZACJI (sekcja 14).
+- Dlaczego:
+  - Uzytkownik poprosil o jeszcze prostsze wyjasnienie runbooka "jak dla laika".
+- Ryzyko/regresja:
+  - Niskie; zmiany tylko w dokumentacji.
+  - Ryzyko operacyjne: zbyt duze uproszczenie moze pominac niuanse diagnostyczne, dlatego zostawiono sekcje o twardej regresji technicznej i priorytetach P0/P1.
+- Jak zweryfikowano:
+  - Przeglad tresci dokumentow i spojnosc odwolan.
+  - `corepack pnpm lint` - PASS.
+  - `corepack pnpm typecheck` - PASS.
+  - `corepack pnpm test` - PASS.
+  - `corepack pnpm build` - PASS.
+- Nastepny krok:
+  - Wykonac runbook w nowej, uproszczonej wersji i podjac decyzje GO/NO-GO przed startem Fazy 9.
