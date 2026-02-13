@@ -8,7 +8,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const pnpmCmd = 'pnpm';
 const useShell = process.platform === 'win32';
 const children = new Set();
-const DEV_SERVER_HOST = '127.0.0.1';
+const DEV_SERVER_HOST = 'localhost';
 const DEV_SERVER_PORT = 5173;
 const DEV_SERVER_URL = `http://${DEV_SERVER_HOST}:${String(DEV_SERVER_PORT)}`;
 
@@ -64,6 +64,52 @@ function waitForPort(host, port, timeoutMs) {
   });
 }
 
+function waitForHttp(url, timeoutMs) {
+  const started = Date.now();
+
+  return new Promise((resolve, reject) => {
+    const tryFetch = () => {
+      const elapsedMs = Date.now() - started;
+      if (elapsedMs > timeoutMs) {
+        reject(new Error(`Timeout: endpoint ${url} nie odpowiada.`));
+        return;
+      }
+
+      const remainingMs = timeoutMs - elapsedMs;
+      const requestTimeoutMs = Math.max(1, Math.min(remainingMs, 5_000));
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => {
+        controller.abort();
+      }, requestTimeoutMs);
+
+      void fetch(url, { method: 'GET', signal: controller.signal })
+        .then((response) => {
+          if (response.ok) {
+            resolve();
+            return;
+          }
+          if (Date.now() - started > timeoutMs) {
+            reject(new Error(`Timeout: ${url} zwrocil status ${String(response.status)}.`));
+            return;
+          }
+          setTimeout(tryFetch, 250);
+        })
+        .catch(() => {
+          if (Date.now() - started > timeoutMs) {
+            reject(new Error(`Timeout: endpoint ${url} nie odpowiada.`));
+            return;
+          }
+          setTimeout(tryFetch, 250);
+        })
+        .finally(() => {
+          clearTimeout(abortTimer);
+        });
+    };
+
+    tryFetch();
+  });
+}
+
 function shutdown(exitCode) {
   for (const child of children) {
     if (!child.killed) {
@@ -84,9 +130,8 @@ async function main() {
   const uiProcess = spawnProcess([
     '--filter',
     '@moze/ui',
-    'run',
-    'dev',
-    '--',
+    'exec',
+    'vite',
     '--host',
     DEV_SERVER_HOST,
     '--port',
@@ -101,6 +146,7 @@ async function main() {
 
   console.log(`[dev] Wait for UI at ${DEV_SERVER_URL} ...`);
   await waitForPort(DEV_SERVER_HOST, DEV_SERVER_PORT, 60_000);
+  await waitForHttp(DEV_SERVER_URL, 60_000);
 
   console.log('[dev] Start Electron...');
   const electronProcess = spawnProcess(
