@@ -1,10 +1,14 @@
 export { createCoreRepository, type CoreRepository } from './core-repository.ts';
 export type {
   AppMetaEntryInput,
+  ChannelSnapshotRecord,
   CreateSyncRunInput,
+  GetChannelSnapshotInput,
   FinishSyncRunInput,
   GetLatestOpenSyncRunInput,
+  GetPersistedSyncBatchInput,
   GetSyncRunByIdInput,
+  GetVideoSnapshotsInput,
   RawApiResponseInput,
   ResumeSyncRunInput,
   SyncRunRecord,
@@ -14,4 +18,5 @@ export type {
   UpsertProfileInput,
   UpsertVideoDayInput,
   UpsertVideoInput,
+  VideoSnapshotRecord,
 } from './types.ts';

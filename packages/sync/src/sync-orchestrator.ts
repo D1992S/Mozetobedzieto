@@ -120,6 +120,16 @@ function createSyncError(
   return AppError.create(code, message, 'error', context, cause ? toError(cause) : undefined);
 }
 
+class PersistTransactionAbort extends Error {
+  readonly appError: AppError;
+
+  constructor(appError: AppError) {
+    super(appError.message);
+    this.name = 'PersistTransactionAbort';
+    this.appError = appError;
+  }
+}
+
 function isRetryableProviderError(error: AppError): boolean {
   if (NON_RETRYABLE_PROVIDER_CODES.has(error.code)) {
     return false;
@@ -151,6 +161,15 @@ function dedupeVideoIds(videos: readonly ProviderVideoSnapshot[]): string[] {
     ids.add(video.videoId);
   }
   return [...ids];
+}
+
+function computeNonNegativeDelta(currentValue: number, previousValue: number | null | undefined): number {
+  const baseline = previousValue ?? currentValue;
+  const delta = currentValue - baseline;
+  if (!Number.isFinite(delta) || delta <= 0) {
+    return 0;
+  }
+  return Math.floor(delta);
 }
 
 function defaultSleep(delayMs: number): Promise<void> {
@@ -387,128 +406,191 @@ export function createSyncOrchestrator(input: CreateSyncOrchestratorInput): Sync
       );
     }
 
-    const syncTimestamp = now().toISOString();
-    const syncDate = toIsoDate(now());
-    const likeSum = collected.videoStats.reduce((total, video) => total + video.likeCount, 0);
-    const commentSum = collected.videoStats.reduce((total, video) => total + video.commentCount, 0);
-
-    const upsertChannelResult = repository.upsertChannel({
-      channelId: collected.channel.channelId,
-      profileId,
-      name: collected.channel.name,
-      description: collected.channel.description,
-      thumbnailUrl: collected.channel.thumbnailUrl,
-      publishedAt: collected.channel.createdAt,
-      subscriberCount: collected.channel.subscriberCount,
-      videoCount: collected.channel.videoCount,
-      viewCount: collected.channel.viewCount,
-      lastSyncAt: syncTimestamp,
-      updatedAt: syncTimestamp,
-    });
-    if (!upsertChannelResult.ok) {
-      return upsertChannelResult;
+    const uniqueVideoStatsById = new Map<string, ProviderVideoSnapshot>();
+    for (const video of collected.videoStats) {
+      uniqueVideoStatsById.set(video.videoId, video);
     }
+    const uniqueVideoStats = [...uniqueVideoStatsById.values()];
+    const persistTransaction = input.db.transaction(() => {
+      const syncTimestamp = now().toISOString();
+      const syncDate = toIsoDate(now());
 
-    const upsertVideosResult = repository.upsertVideos(
-      collected.videoStats.map((video) => ({
-        videoId: video.videoId,
-        channelId: video.channelId,
-        title: video.title,
-        description: video.description,
-        publishedAt: video.publishedAt,
-        durationSeconds: video.durationSeconds,
-        viewCount: video.viewCount,
-        likeCount: video.likeCount,
-        commentCount: video.commentCount,
-        thumbnailUrl: video.thumbnailUrl,
-        updatedAt: syncTimestamp,
-      })),
-    );
-    if (!upsertVideosResult.ok) {
-      return upsertVideosResult;
-    }
-
-    const upsertChannelDayResult = repository.upsertChannelDays([
-      {
+      const channelSnapshotResult = repository.getChannelSnapshot({
         channelId: collected.channel.channelId,
-        date: syncDate,
-        subscribers: collected.channel.subscriberCount,
-        views: collected.channel.viewCount,
-        videos: collected.channel.videoCount,
-        likes: likeSum,
-        comments: commentSum,
-        watchTimeMinutes: null,
-        updatedAt: syncTimestamp,
-      },
-    ]);
-    if (!upsertChannelDayResult.ok) {
-      return upsertChannelDayResult;
-    }
-
-    const upsertVideoDayResult = repository.upsertVideoDays(
-      collected.videoStats.map((video) => ({
-        videoId: video.videoId,
-        channelId: video.channelId,
-        date: syncDate,
-        views: video.viewCount,
-        likes: video.likeCount,
-        comments: video.commentCount,
-        watchTimeMinutes: null,
-        impressions: null,
-        ctr: null,
-        updatedAt: syncTimestamp,
-      })),
-    );
-    if (!upsertVideoDayResult.ok) {
-      return upsertVideoDayResult;
-    }
-
-    const rawEntries: Array<{
-      endpoint: string;
-      requestParamsJson: string;
-      responseBodyJson: string;
-    }> = [
-      {
-        endpoint: 'getChannelStats',
-        requestParamsJson: JSON.stringify({ channelId: requestedChannelId }),
-        responseBodyJson: JSON.stringify(collected.channel),
-      },
-      {
-        endpoint: 'getRecentVideos',
-        requestParamsJson: JSON.stringify({
-          channelId: requestedChannelId,
-          limit: collected.recentVideos.length,
-        }),
-        responseBodyJson: JSON.stringify(collected.recentVideos),
-      },
-      {
-        endpoint: 'getVideoStats',
-        requestParamsJson: JSON.stringify({
-          videoIds: dedupeVideoIds(collected.videoStats),
-        }),
-        responseBodyJson: JSON.stringify(collected.videoStats),
-      },
-    ];
-
-    for (const entry of rawEntries) {
-      const rawResult = repository.recordRawApiResponse({
-        source: `sync:${collected.mode}:${collected.providerName}`,
-        endpoint: entry.endpoint,
-        requestParamsJson: entry.requestParamsJson,
-        responseBodyJson: entry.responseBodyJson,
-        httpStatus: 200,
-        fetchedAt: syncTimestamp,
-        syncRunId,
       });
-      if (!rawResult.ok) {
-        return rawResult;
+      if (!channelSnapshotResult.ok) {
+        throw new PersistTransactionAbort(channelSnapshotResult.error);
       }
-    }
 
-    return ok({
-      channelId: collected.channel.channelId,
-      recordsProcessed: 2 + collected.videoStats.length * 2,
+      const previousVideoSnapshotById = new Map<
+        string,
+        {
+          viewCount: number;
+          likeCount: number;
+          commentCount: number;
+        }
+      >();
+      if (uniqueVideoStats.length > 0) {
+        const previousVideoSnapshotsResult = repository.getVideoSnapshots({
+          videoIds: dedupeVideoIds(uniqueVideoStats),
+        });
+        if (!previousVideoSnapshotsResult.ok) {
+          throw new PersistTransactionAbort(previousVideoSnapshotsResult.error);
+        }
+
+        for (const snapshot of previousVideoSnapshotsResult.value) {
+          previousVideoSnapshotById.set(snapshot.videoId, snapshot);
+        }
+      }
+
+      const videoDayInputs = uniqueVideoStats.map((video) => {
+        const previous = previousVideoSnapshotById.get(video.videoId);
+        return {
+          videoId: video.videoId,
+          channelId: video.channelId,
+          date: syncDate,
+          views: computeNonNegativeDelta(video.viewCount, previous?.viewCount),
+          likes: computeNonNegativeDelta(video.likeCount, previous?.likeCount),
+          comments: computeNonNegativeDelta(video.commentCount, previous?.commentCount),
+          watchTimeMinutes: null,
+          impressions: null,
+          ctr: null,
+          updatedAt: syncTimestamp,
+        };
+      });
+
+      const likeDeltaSum = videoDayInputs.reduce((total, video) => total + video.likes, 0);
+      const commentDeltaSum = videoDayInputs.reduce((total, video) => total + video.comments, 0);
+      const channelViewsDelta = computeNonNegativeDelta(
+        collected.channel.viewCount,
+        channelSnapshotResult.value?.viewCount,
+      );
+
+      const upsertChannelResult = repository.upsertChannel({
+        channelId: collected.channel.channelId,
+        profileId,
+        name: collected.channel.name,
+        description: collected.channel.description,
+        thumbnailUrl: collected.channel.thumbnailUrl,
+        publishedAt: collected.channel.createdAt,
+        subscriberCount: collected.channel.subscriberCount,
+        videoCount: collected.channel.videoCount,
+        viewCount: collected.channel.viewCount,
+        lastSyncAt: syncTimestamp,
+        updatedAt: syncTimestamp,
+      });
+      if (!upsertChannelResult.ok) {
+        throw new PersistTransactionAbort(upsertChannelResult.error);
+      }
+
+      const upsertVideosResult = repository.upsertVideos(
+        uniqueVideoStats.map((video) => ({
+          videoId: video.videoId,
+          channelId: video.channelId,
+          title: video.title,
+          description: video.description,
+          publishedAt: video.publishedAt,
+          durationSeconds: video.durationSeconds,
+          viewCount: video.viewCount,
+          likeCount: video.likeCount,
+          commentCount: video.commentCount,
+          thumbnailUrl: video.thumbnailUrl,
+          updatedAt: syncTimestamp,
+        })),
+      );
+      if (!upsertVideosResult.ok) {
+        throw new PersistTransactionAbort(upsertVideosResult.error);
+      }
+
+      const upsertChannelDayResult = repository.upsertChannelDays([
+        {
+          channelId: collected.channel.channelId,
+          date: syncDate,
+          subscribers: collected.channel.subscriberCount,
+          views: channelViewsDelta,
+          videos: collected.channel.videoCount,
+          likes: likeDeltaSum,
+          comments: commentDeltaSum,
+          watchTimeMinutes: null,
+          updatedAt: syncTimestamp,
+        },
+      ]);
+      if (!upsertChannelDayResult.ok) {
+        throw new PersistTransactionAbort(upsertChannelDayResult.error);
+      }
+
+      const upsertVideoDayResult = repository.upsertVideoDays(videoDayInputs);
+      if (!upsertVideoDayResult.ok) {
+        throw new PersistTransactionAbort(upsertVideoDayResult.error);
+      }
+
+      const rawEntries: Array<{
+        endpoint: string;
+        requestParamsJson: string;
+        responseBodyJson: string;
+      }> = [
+        {
+          endpoint: 'getChannelStats',
+          requestParamsJson: JSON.stringify({ channelId: requestedChannelId }),
+          responseBodyJson: JSON.stringify(collected.channel),
+        },
+        {
+          endpoint: 'getRecentVideos',
+          requestParamsJson: JSON.stringify({
+            channelId: requestedChannelId,
+            limit: collected.recentVideos.length,
+          }),
+          responseBodyJson: JSON.stringify(collected.recentVideos),
+        },
+        {
+          endpoint: 'getVideoStats',
+          requestParamsJson: JSON.stringify({
+            videoIds: dedupeVideoIds(uniqueVideoStats),
+          }),
+          responseBodyJson: JSON.stringify(uniqueVideoStats),
+        },
+      ];
+
+      for (const entry of rawEntries) {
+        const rawResult = repository.recordRawApiResponse({
+          source: `sync:${collected.mode}:${collected.providerName}`,
+          endpoint: entry.endpoint,
+          requestParamsJson: entry.requestParamsJson,
+          responseBodyJson: entry.responseBodyJson,
+          httpStatus: 200,
+          fetchedAt: syncTimestamp,
+          syncRunId,
+        });
+        if (!rawResult.ok) {
+          throw new PersistTransactionAbort(rawResult.error);
+        }
+      }
+
+      return {
+        channelId: collected.channel.channelId,
+        recordsProcessed: 2 + uniqueVideoStats.length * 2,
+      };
     });
+
+    try {
+      return ok(persistTransaction());
+    } catch (cause) {
+      if (cause instanceof PersistTransactionAbort) {
+        return err(cause.appError);
+      }
+      return err(
+        createSyncError(
+          'SYNC_PERSIST_WAREHOUSE_FAILED',
+          'Nie udalo sie atomowo zapisac danych synchronizacji.',
+          {
+            syncRunId,
+            requestedChannelId,
+            provider: collected.providerName,
+          },
+          cause,
+        ),
+      );
+    }
   };
 
   const executeSyncRun = async (params: {
@@ -523,8 +605,26 @@ export function createSyncOrchestrator(input: CreateSyncOrchestratorInput): Sync
     let currentStage: SyncStage = params.startFromStage;
     let recordsProcessed = 0;
     let pipelineFeatures: number | null = null;
+    let persistedBatchAlreadyProcessed = false;
 
     if (params.startFromStage !== 'run-pipeline') {
+      const persistedBatchResult = repository.hasPersistedSyncBatch({
+        syncRunId: params.syncRunId,
+      });
+      if (!persistedBatchResult.ok) {
+        return finishAsFailed(
+          params.syncRunId,
+          params.startedAtIso,
+          'persist-warehouse',
+          persistedBatchResult.error,
+          recordsProcessed,
+          pipelineFeatures,
+        );
+      }
+      persistedBatchAlreadyProcessed = persistedBatchResult.value;
+    }
+
+    if (params.startFromStage !== 'run-pipeline' && !persistedBatchAlreadyProcessed) {
       currentStage = 'collect-provider-data';
       const checkpointResult = updateCheckpoint(params.syncRunId, currentStage, 'running');
       if (!checkpointResult.ok) {
@@ -600,6 +700,15 @@ export function createSyncOrchestrator(input: CreateSyncOrchestratorInput): Sync
 
       targetChannelId = persistResult.value.channelId;
       recordsProcessed = persistResult.value.recordsProcessed;
+    }
+
+    if (params.startFromStage !== 'run-pipeline' && persistedBatchAlreadyProcessed) {
+      emitProgress({
+        syncRunId: toEventSyncRunId(params.syncRunId),
+        stage: 'persist-warehouse',
+        percent: 65,
+        message: 'Wykryto zapisany batch persist dla tego sync run. Pomijanie ponownego zapisu.',
+      });
     }
 
     currentStage = 'run-pipeline';
