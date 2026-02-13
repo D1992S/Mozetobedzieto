@@ -832,6 +832,7 @@ Task jest zamknięty **dopiero** gdy:
 - [x] Pierwszy dashboard na fixture data. ✅ Faza 2/3
 - [x] Multi-profile + settings per profil + auth safeStorage. ✅ Faza 8
 - [x] Dokumenty: `AGENTS.md`, `architecture/overview.md`, `architecture/data-flow.md`. ✅ Faza 0
+- [x] Runbook testów funkcjonalnych Faz 0-8 uproszczony dla początkujących. ✅ Faza 8
 - [ ] ADR-001: Wybór stack'u technologicznego.
 
 ---

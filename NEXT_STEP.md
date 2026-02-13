@@ -167,3 +167,16 @@ Szczegoly: `docs/PLAN_REALIZACJI.md`
   - usuniecie niejasnosci "co mam zrobic" przed startem Fazy 9.
 - Rekomendacja:
   - wykonac testy wg sekcji 0 + 2 + 3 w `docs/runbooks/test-plan-faza-0-8.md` i podjac decyzje GO/NO-GO.
+
+## Stan techniczny po sesji (2026-02-13, test-plan simplification)
+
+- Uproszczono runbook testow funkcjonalnych dla Faz 0-8:
+  - `docs/runbooks/test-plan-faza-0-8.md`
+- Zmiany w runbooku:
+  - usunieto zbedny zargon i skrocono instrukcje do prostych krokow,
+  - dodano jedna, jasna regule decyzji GO/NO-GO,
+  - pozostawiono tylko niezbedne komendy i prosty szablon raportu.
+- Cel zmiany:
+  - umozliwic wykonanie testow osobie nietechnicznej, bez znajomosci Electron/IPC/ML.
+- Rekomendacja:
+  - wykonac runbook od sekcji 2 do 8 i podjac decyzje GO/NO-GO przed startem implementacji Fazy 9.
