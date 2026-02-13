@@ -68,6 +68,9 @@ function createDbError(
   return AppError.create(code, message, 'error', context, toError(cause));
 }
 
+const PERSISTED_SYNC_BATCH_ENDPOINTS = ['getChannelStats', 'getRecentVideos', 'getVideoStats'] as const;
+const PERSISTED_SYNC_BATCH_ENDPOINT_COUNT = PERSISTED_SYNC_BATCH_ENDPOINTS.length;
+
 export function createCoreRepository(db: Database.Database): CoreRepository {
   const upsertProfileStmt = db.prepare<{
     id: string;
@@ -204,7 +207,7 @@ export function createCoreRepository(db: Database.Database): CoreRepository {
   const getPersistedSyncBatchCountStmt = db.prepare<{ syncRunId: number }, { total: number }>(
     `
       SELECT
-        COUNT(*) AS total
+        COUNT(DISTINCT endpoint) AS total
       FROM raw_api_responses
       WHERE sync_run_id = @syncRunId
         AND endpoint IN ('getChannelStats', 'getRecentVideos', 'getVideoStats')
@@ -418,7 +421,7 @@ export function createCoreRepository(db: Database.Database): CoreRepository {
         videos = excluded.videos,
         likes = fact_channel_day.likes + excluded.likes,
         comments = fact_channel_day.comments + excluded.comments,
-        watch_time_minutes = COALESCE(excluded.watch_time_minutes, fact_channel_day.watch_time_minutes),
+        watch_time_minutes = COALESCE(fact_channel_day.watch_time_minutes, 0) + COALESCE(excluded.watch_time_minutes, 0),
         updated_at = excluded.updated_at
     `,
   );
@@ -465,7 +468,7 @@ export function createCoreRepository(db: Database.Database): CoreRepository {
         views = fact_video_day.views + excluded.views,
         likes = fact_video_day.likes + excluded.likes,
         comments = fact_video_day.comments + excluded.comments,
-        watch_time_minutes = COALESCE(excluded.watch_time_minutes, fact_video_day.watch_time_minutes),
+        watch_time_minutes = COALESCE(fact_video_day.watch_time_minutes, 0) + COALESCE(excluded.watch_time_minutes, 0),
         impressions = COALESCE(excluded.impressions, fact_video_day.impressions),
         ctr = COALESCE(excluded.ctr, fact_video_day.ctr),
         updated_at = excluded.updated_at
@@ -681,7 +684,7 @@ export function createCoreRepository(db: Database.Database): CoreRepository {
     hasPersistedSyncBatch: (input) => {
       try {
         const row = getPersistedSyncBatchCountStmt.get({ syncRunId: input.syncRunId });
-        return ok((row?.total ?? 0) >= 3);
+        return ok((row?.total ?? 0) === PERSISTED_SYNC_BATCH_ENDPOINT_COUNT);
       } catch (cause) {
         return err(
           createDbError(
