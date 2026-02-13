@@ -1,11 +1,72 @@
-import { createChannelQueries, createDatabaseConnection, createMetricsQueries, runMigrations, type ChannelQueries, type DatabaseConnection, type MetricsQueries } from '@moze/core';
+﻿import {
+  createChannelQueries,
+  createCoreRepository,
+  createDatabaseConnection,
+  createMetricsQueries,
+  createSettingsQueries,
+  runMigrations,
+  type ChannelQueries,
+  type DatabaseConnection,
+  type MetricsQueries,
+  type SettingsQueries,
+} from '@moze/core';
 import { getLatestMlForecast, runMlBaseline } from '@moze/ml';
 import { exportDashboardReport, generateDashboardReport } from '@moze/reports';
-import { createCachedDataProvider, createDataModeManager, createFakeDataProvider, createRateLimitedDataProvider, createRealDataProvider, createRecordingDataProvider, createSyncOrchestrator, type DataModeManager, type SyncOrchestrator } from '@moze/sync';
-import { AppError, IPC_EVENTS, createLogger, err, ok, type AppStatusDTO, type DataModeProbeInputDTO, type DataModeProbeResultDTO, type DataModeStatusDTO, type KpiQueryDTO, type KpiResultDTO, type MlForecastQueryInputDTO, type MlForecastResultDTO, type MlRunBaselineInputDTO, type MlRunBaselineResultDTO, type ReportExportInputDTO, type ReportExportResultDTO, type ReportGenerateInputDTO, type ReportGenerateResultDTO, type Result, type SetDataModeInputDTO, type SyncCommandResultDTO, type SyncResumeInputDTO, type SyncStartInputDTO, type TimeseriesQueryDTO, type TimeseriesResultDTO } from '@moze/shared';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import {
+  createCachedDataProvider,
+  createDataModeManager,
+  createFakeDataProvider,
+  createRateLimitedDataProvider,
+  createRealDataProvider,
+  createRecordingDataProvider,
+  createSyncOrchestrator,
+  type DataModeManager,
+  type SyncOrchestrator,
+} from '@moze/sync';
+import {
+  AppError,
+  IPC_EVENTS,
+  createLogger,
+  err,
+  ok,
+  type AppStatusDTO,
+  type AuthConnectInputDTO,
+  type AuthStatusDTO,
+  type DataModeProbeInputDTO,
+  type DataModeProbeResultDTO,
+  type DataModeStatusDTO,
+  type KpiQueryDTO,
+  type KpiResultDTO,
+  type MlForecastQueryInputDTO,
+  type MlForecastResultDTO,
+  type MlRunBaselineInputDTO,
+  type MlRunBaselineResultDTO,
+  type ProfileCreateInputDTO,
+  type ProfileListResultDTO,
+  type ProfileSetActiveInputDTO,
+  type ProfileSettingsDTO,
+  type ProfileSummaryDTO,
+  type ReportExportInputDTO,
+  type ReportExportResultDTO,
+  type ReportGenerateInputDTO,
+  type ReportGenerateResultDTO,
+  type Result,
+  type SettingsUpdateInputDTO,
+  type SetDataModeInputDTO,
+  type SyncCommandResultDTO,
+  type SyncResumeInputDTO,
+  type SyncStartInputDTO,
+  type TimeseriesQueryDTO,
+  type TimeseriesResultDTO,
+} from '@moze/shared';
+import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  createProfileManager,
+  type ProfileManager,
+  type SecretCryptoAdapter,
+} from './profile-manager.js';
 import { registerIpcHandlers, type DesktopIpcBackend } from './ipc-handlers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,7 +76,7 @@ const IS_DEV = process.env.NODE_ENV !== 'production';
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173';
 const UI_ENTRY_PATH = path.join(__dirname, '../../ui/dist/index.html');
 const REPO_ROOT_PATH = path.resolve(__dirname, '../../..');
-const DB_FILENAME = 'mozetobedzieto.sqlite';
+const PROFILE_RUNTIME_DIRNAME = 'profiles-runtime';
 const DEFAULT_FAKE_FIXTURE_PATH = path.join(REPO_ROOT_PATH, 'fixtures', 'seed-data.json');
 const DEFAULT_RECORDING_PATH = path.join(REPO_ROOT_PATH, 'fixtures', 'recordings', 'latest-provider-recording.json');
 
@@ -23,8 +84,10 @@ interface BackendState {
   connection: DatabaseConnection | null;
   metricsQueries: MetricsQueries | null;
   channelQueries: ChannelQueries | null;
+  settingsQueries: SettingsQueries | null;
   dataModeManager: DataModeManager | null;
   syncOrchestrator: SyncOrchestrator | null;
+  profileManager: ProfileManager | null;
   dbPath: string | null;
 }
 
@@ -32,8 +95,10 @@ const backendState: BackendState = {
   connection: null,
   metricsQueries: null,
   channelQueries: null,
+  settingsQueries: null,
   dataModeManager: null,
   syncOrchestrator: null,
+  profileManager: null,
   dbPath: null,
 };
 
@@ -69,7 +134,7 @@ function emitSyncEvent(eventName: string, payload: unknown): void {
 function createDbNotReadyError(): AppError {
   return AppError.create(
     'APP_DB_NOT_READY',
-    'Baza danych nie jest gotowa. Uruchom ponownie aplikację.',
+    'Baza danych nie jest gotowa. Uruchom ponownie aplikacje.',
     'error',
     { dbPath: backendState.dbPath },
   );
@@ -93,6 +158,15 @@ function createSyncNotReadyError(): AppError {
   );
 }
 
+function createProfileReloadFailedError(details: Record<string, unknown>): AppError {
+  return AppError.create(
+    'APP_PROFILE_RELOAD_FAILED',
+    'Nie udalo sie przelaczyc aktywnego profilu.',
+    'error',
+    details,
+  );
+}
+
 function resolvePathFromEnv(value: string | undefined, fallbackPath: string): string {
   if (!value) {
     return fallbackPath;
@@ -103,6 +177,14 @@ function resolvePathFromEnv(value: string | undefined, fallbackPath: string): st
   }
 
   return path.join(REPO_ROOT_PATH, value);
+}
+
+function createSafeStorageAdapter(): SecretCryptoAdapter {
+  return {
+    isAvailable: () => safeStorage.isEncryptionAvailable(),
+    encryptString: (plainText) => safeStorage.encryptString(plainText),
+    decryptString: (cipherText) => safeStorage.decryptString(cipherText),
+  };
 }
 
 function initializeDataModes(): Result<DataModeManager, AppError> {
@@ -168,36 +250,116 @@ function initializeDataModes(): Result<DataModeManager, AppError> {
   return ok(manager);
 }
 
+function resolveProfilesRootDir(): string {
+  return path.join(app.getPath('userData'), PROFILE_RUNTIME_DIRNAME);
+}
+
+function ensureProfileManager(): Result<ProfileManager, AppError> {
+  if (backendState.profileManager) {
+    return ok(backendState.profileManager);
+  }
+
+  const createResult = createProfileManager({
+    rootDir: resolveProfilesRootDir(),
+    crypto: createSafeStorageAdapter(),
+  });
+  if (!createResult.ok) {
+    return createResult;
+  }
+
+  backendState.profileManager = createResult.value;
+
+  logger.info('Profile manager gotowy.', {
+    profilesRootDir: resolveProfilesRootDir(),
+  });
+
+  return ok(createResult.value);
+}
+
+function syncActiveProfileInDatabase(
+  db: DatabaseConnection['db'],
+  profile: ProfileSummaryDTO,
+): Result<void, AppError> {
+  const repository = createCoreRepository(db);
+
+  try {
+    db.prepare('UPDATE profiles SET is_active = 0 WHERE is_active <> 0').run();
+  } catch (cause) {
+    return err(
+      AppError.create(
+        'DB_PROFILE_DEACTIVATE_FAILED',
+        'Nie udalo sie zaktualizowac aktywnego profilu w bazie.',
+        'error',
+        { profileId: profile.id },
+        toError(cause),
+      ),
+    );
+  }
+
+  return repository.upsertProfile({
+    id: profile.id,
+    name: profile.name,
+    isActive: true,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  });
+}
+
 function initializeBackend(): Result<void, AppError> {
   if (backendState.connection) {
     return ok(undefined);
   }
 
-  const dbPath = path.join(app.getPath('userData'), DB_FILENAME);
-  const connectionResult = createDatabaseConnection({ filename: dbPath });
+  const profileManagerResult = ensureProfileManager();
+  if (!profileManagerResult.ok) {
+    return profileManagerResult;
+  }
+
+  const activeProfileResult = profileManagerResult.value.getActiveProfile();
+  if (!activeProfileResult.ok) {
+    return activeProfileResult;
+  }
+
+  const dbPathResult = profileManagerResult.value.getActiveDbPath();
+  if (!dbPathResult.ok) {
+    return dbPathResult;
+  }
+
+  const connectionResult = createDatabaseConnection({ filename: dbPathResult.value });
   if (!connectionResult.ok) {
     return connectionResult;
   }
 
-  const migrationResult = runMigrations(connectionResult.value.db);
+  const connection = connectionResult.value;
+  const migrationResult = runMigrations(connection.db);
   if (!migrationResult.ok) {
-    const closeResult = connectionResult.value.close();
+    const closeResult = connection.close();
     if (!closeResult.ok) {
-      logger.warning('Nie udało się zamknąć połączenia DB po błędzie migracji.', {
+      logger.warning('Nie udalo sie zamknac polaczenia DB po bledzie migracji.', {
         error: closeResult.error.toDTO(),
       });
     }
     return migrationResult;
   }
 
-  backendState.connection = connectionResult.value;
-  backendState.metricsQueries = createMetricsQueries(connectionResult.value.db);
-  backendState.channelQueries = createChannelQueries(connectionResult.value.db);
-  backendState.dbPath = dbPath;
+  const profileSyncResult = syncActiveProfileInDatabase(connection.db, activeProfileResult.value);
+  if (!profileSyncResult.ok) {
+    const closeResult = connection.close();
+    if (!closeResult.ok) {
+      logger.warning('Nie udalo sie zamknac polaczenia DB po bledzie sync profilu.', {
+        error: closeResult.error.toDTO(),
+      });
+    }
+    return profileSyncResult;
+  }
+
+  const metricsQueries = createMetricsQueries(connection.db);
+  const channelQueries = createChannelQueries(connection.db);
+  const settingsQueries = createSettingsQueries(connection.db);
 
   const dataModesResult = initializeDataModes();
   if (!dataModesResult.ok) {
-    const closeResult = connectionResult.value.close();
+    const closeResult = connection.close();
     if (!closeResult.ok) {
       logger.warning('Nie udalo sie zamknac polaczenia DB po bledzie data mode init.', {
         error: closeResult.error.toDTO(),
@@ -206,9 +368,8 @@ function initializeBackend(): Result<void, AppError> {
     return err(dataModesResult.error);
   }
 
-  backendState.dataModeManager = dataModesResult.value;
-  backendState.syncOrchestrator = createSyncOrchestrator({
-    db: connectionResult.value.db,
+  const syncOrchestrator = createSyncOrchestrator({
+    db: connection.db,
     dataModeManager: dataModesResult.value,
     logger: logger.withContext({ module: 'sync-orchestrator' }),
     hooks: {
@@ -224,8 +385,17 @@ function initializeBackend(): Result<void, AppError> {
     },
   });
 
+  backendState.connection = connection;
+  backendState.metricsQueries = metricsQueries;
+  backendState.channelQueries = channelQueries;
+  backendState.settingsQueries = settingsQueries;
+  backendState.dataModeManager = dataModesResult.value;
+  backendState.syncOrchestrator = syncOrchestrator;
+  backendState.dbPath = dbPathResult.value;
+
   logger.info('Backend gotowy.', {
-    dbPath,
+    dbPath: dbPathResult.value,
+    activeProfileId: activeProfileResult.value.id,
     migrationsApplied: migrationResult.value.applied.length,
     migrationsAlreadyApplied: migrationResult.value.alreadyApplied.length,
   });
@@ -234,47 +404,57 @@ function initializeBackend(): Result<void, AppError> {
 }
 
 function closeBackend(): void {
-  if (!backendState.connection) {
-    return;
-  }
-
-  const closeResult = backendState.connection.close();
-  if (!closeResult.ok) {
-    logger.error('Nie udało się zamknąć bazy danych.', { error: closeResult.error.toDTO() });
+  if (backendState.connection) {
+    const closeResult = backendState.connection.close();
+    if (!closeResult.ok) {
+      logger.error('Nie udalo sie zamknac bazy danych.', { error: closeResult.error.toDTO() });
+    }
   }
 
   backendState.connection = null;
   backendState.metricsQueries = null;
   backendState.channelQueries = null;
+  backendState.settingsQueries = null;
   backendState.dataModeManager = null;
   backendState.syncOrchestrator = null;
+  backendState.dbPath = null;
+}
+
+function reloadBackendForActiveProfile(): Result<void, AppError> {
+  closeBackend();
+  const backendInitResult = initializeBackend();
+  if (!backendInitResult.ok) {
+    return err(createProfileReloadFailedError({ error: backendInitResult.error.toDTO() }));
+  }
+  return ok(undefined);
+}
+
+function readActiveProfile(): Result<ProfileSummaryDTO, AppError> {
+  const profileManagerResult = ensureProfileManager();
+  if (!profileManagerResult.ok) {
+    return profileManagerResult;
+  }
+  return profileManagerResult.value.getActiveProfile();
 }
 
 function readAppStatus(): Result<AppStatusDTO, AppError> {
+  const activeProfileResult = readActiveProfile();
+  if (!activeProfileResult.ok) {
+    return activeProfileResult;
+  }
+
   const db = backendState.connection?.db;
   if (!db) {
     return ok({
       version: app.getVersion(),
       dbReady: false,
-      profileId: null,
+      profileId: activeProfileResult.value.id,
       syncRunning: false,
       lastSyncAt: null,
     });
   }
 
   try {
-    const activeProfileRow = db
-      .prepare<[], { id: string }>(
-        `
-          SELECT id
-          FROM profiles
-          WHERE is_active = 1
-          ORDER BY updated_at DESC, id ASC
-          LIMIT 1
-        `,
-      )
-      .get();
-
     const latestSyncRunRow = db
       .prepare<[], { status: string; finishedAt: string | null }>(
         `
@@ -320,7 +500,7 @@ function readAppStatus(): Result<AppStatusDTO, AppError> {
     return ok({
       version: app.getVersion(),
       dbReady: true,
-      profileId: activeProfileRow?.id ?? null,
+      profileId: activeProfileResult.value.id,
       syncRunning: Boolean(latestSyncRunRow && latestSyncRunRow.finishedAt === null),
       lastSyncAt,
     });
@@ -328,7 +508,7 @@ function readAppStatus(): Result<AppStatusDTO, AppError> {
     return err(
       AppError.create(
         'APP_STATUS_READ_FAILED',
-        'Nie udało się odczytać statusu aplikacji.',
+        'Nie udalo sie odczytac statusu aplikacji.',
         'error',
         {},
         toError(cause),
@@ -379,11 +559,121 @@ function probeDataMode(input: DataModeProbeInputDTO): Result<DataModeProbeResult
   return backendState.dataModeManager.probe(input);
 }
 
+function listProfilesCommand(): Result<ProfileListResultDTO, AppError> {
+  const profileManagerResult = ensureProfileManager();
+  if (!profileManagerResult.ok) {
+    return profileManagerResult;
+  }
+  return profileManagerResult.value.listProfiles();
+}
+
+function createProfileCommand(input: ProfileCreateInputDTO): Result<ProfileListResultDTO, AppError> {
+  const profileManagerResult = ensureProfileManager();
+  if (!profileManagerResult.ok) {
+    return profileManagerResult;
+  }
+
+  const previousActiveProfileResult = profileManagerResult.value.getActiveProfile();
+  if (!previousActiveProfileResult.ok) {
+    return previousActiveProfileResult;
+  }
+
+  const createResult = profileManagerResult.value.createProfile(input);
+  if (!createResult.ok) {
+    return createResult;
+  }
+
+  const previousActiveProfileId = previousActiveProfileResult.value.id;
+  const nextActiveProfileId = createResult.value.activeProfileId;
+
+  if (nextActiveProfileId && nextActiveProfileId !== previousActiveProfileId) {
+    const reloadResult = reloadBackendForActiveProfile();
+    if (!reloadResult.ok) {
+      return reloadResult;
+    }
+  }
+
+  return createResult;
+}
+
+function setActiveProfileCommand(input: ProfileSetActiveInputDTO): Result<ProfileListResultDTO, AppError> {
+  const profileManagerResult = ensureProfileManager();
+  if (!profileManagerResult.ok) {
+    return profileManagerResult;
+  }
+
+  const previousActiveProfileResult = profileManagerResult.value.getActiveProfile();
+  if (!previousActiveProfileResult.ok) {
+    return previousActiveProfileResult;
+  }
+
+  const setActiveResult = profileManagerResult.value.setActiveProfile(input);
+  if (!setActiveResult.ok) {
+    return setActiveResult;
+  }
+
+  if (setActiveResult.value.activeProfileId !== previousActiveProfileResult.value.id) {
+    const reloadResult = reloadBackendForActiveProfile();
+    if (!reloadResult.ok) {
+      return reloadResult;
+    }
+  }
+
+  return setActiveResult;
+}
+
+function readProfileSettingsCommand(): Result<ProfileSettingsDTO, AppError> {
+  if (!backendState.settingsQueries) {
+    return err(createDbNotReadyError());
+  }
+  return backendState.settingsQueries.getProfileSettings();
+}
+
+function updateProfileSettingsCommand(input: SettingsUpdateInputDTO): Result<ProfileSettingsDTO, AppError> {
+  if (!backendState.settingsQueries) {
+    return err(createDbNotReadyError());
+  }
+  return backendState.settingsQueries.updateProfileSettings(input.settings);
+}
+
+function readAuthStatusCommand(): Result<AuthStatusDTO, AppError> {
+  const profileManagerResult = ensureProfileManager();
+  if (!profileManagerResult.ok) {
+    return profileManagerResult;
+  }
+  return profileManagerResult.value.getAuthStatus();
+}
+
+function connectAuthCommand(input: AuthConnectInputDTO): Result<AuthStatusDTO, AppError> {
+  const profileManagerResult = ensureProfileManager();
+  if (!profileManagerResult.ok) {
+    return profileManagerResult;
+  }
+  return profileManagerResult.value.connectAuth(input);
+}
+
+function disconnectAuthCommand(): Result<AuthStatusDTO, AppError> {
+  const profileManagerResult = ensureProfileManager();
+  if (!profileManagerResult.ok) {
+    return profileManagerResult;
+  }
+  return profileManagerResult.value.disconnectAuth();
+}
+
 async function startSync(input: SyncStartInputDTO): Promise<Result<SyncCommandResultDTO, AppError>> {
   if (!backendState.syncOrchestrator) {
     return err(createSyncNotReadyError());
   }
-  return backendState.syncOrchestrator.startSync(input);
+
+  const activeProfileResult = readActiveProfile();
+  if (!activeProfileResult.ok) {
+    return err(activeProfileResult.error);
+  }
+
+  return backendState.syncOrchestrator.startSync({
+    ...input,
+    profileId: input.profileId ?? activeProfileResult.value.id,
+  });
 }
 
 async function resumeSync(input: SyncResumeInputDTO): Promise<Result<SyncCommandResultDTO, AppError>> {
@@ -459,6 +749,14 @@ const ipcBackend: DesktopIpcBackend = {
   getDataModeStatus: () => readDataModeStatus(),
   setDataMode: (input) => setDataMode(input),
   probeDataMode: (input) => probeDataMode(input),
+  listProfiles: () => listProfilesCommand(),
+  createProfile: (input) => createProfileCommand(input),
+  setActiveProfile: (input) => setActiveProfileCommand(input),
+  getProfileSettings: () => readProfileSettingsCommand(),
+  updateProfileSettings: (input) => updateProfileSettingsCommand(input),
+  getAuthStatus: () => readAuthStatusCommand(),
+  connectAuth: (input) => connectAuthCommand(input),
+  disconnectAuth: () => disconnectAuthCommand(),
   startSync: (input) => startSync(input),
   resumeSync: (input) => resumeSync(input),
   runMlBaseline: (input) => runMlBaselineCommand(input),
@@ -517,9 +815,16 @@ if (!gotTheLock) {
   void app.whenReady().then(() => {
     registerIpcHandlers(ipcMain, ipcBackend);
 
+    const profileManagerInit = ensureProfileManager();
+    if (!profileManagerInit.ok) {
+      logger.error('Nie udalo sie zainicjalizowac menedzera profili.', {
+        error: profileManagerInit.error.toDTO(),
+      });
+    }
+
     const backendInit = initializeBackend();
     if (!backendInit.ok) {
-      logger.error('Nie udało się zainicjalizować backendu.', {
+      logger.error('Nie udalo sie zainicjalizowac backendu.', {
         error: backendInit.error.toDTO(),
       });
     }

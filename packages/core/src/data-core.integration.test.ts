@@ -4,6 +4,7 @@ import { createDatabaseConnection } from './database.ts';
 import { loadSeedFixtureFromFile, seedDatabaseFromFixture } from './fixtures/index.ts';
 import { runMigrations } from './migrations/index.ts';
 import { createMetricsQueries } from './queries/metrics-queries.ts';
+import { createSettingsQueries } from './queries/settings-queries.ts';
 
 const fixturePath = fileURLToPath(new URL('../../../fixtures/seed-data.json', import.meta.url));
 
@@ -182,6 +183,25 @@ describe('Data Core integration', () => {
 
     expect(weeklyResult.value.points.length).toBeGreaterThan(0);
     expect(weeklyResult.value.points.length).toBeLessThan(90);
+
+    const settingsQueries = createSettingsQueries(connectionResult.value.db);
+    const defaultSettingsResult = settingsQueries.getProfileSettings();
+    expect(defaultSettingsResult.ok).toBe(true);
+    if (!defaultSettingsResult.ok) {
+      return;
+    }
+    expect(defaultSettingsResult.value.defaultDatePreset).toBe('30d');
+
+    const updateSettingsResult = settingsQueries.updateProfileSettings({
+      defaultDatePreset: '7d',
+      autoRunSync: true,
+    });
+    expect(updateSettingsResult.ok).toBe(true);
+    if (!updateSettingsResult.ok) {
+      return;
+    }
+    expect(updateSettingsResult.value.defaultDatePreset).toBe('7d');
+    expect(updateSettingsResult.value.autoRunSync).toBe(true);
 
     const closeResult = connectionResult.value.close();
     expect(closeResult.ok).toBe(true);

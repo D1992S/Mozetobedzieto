@@ -3,6 +3,8 @@ import type {
   DataModeProbeResultDTO,
   DataModeStatusDTO,
   SetDataModeInputDTO,
+  AuthConnectInputDTO,
+  AuthStatusDTO,
   AppStatusDTO,
   ChannelIdDTO,
   ChannelInfoDTO,
@@ -13,10 +15,15 @@ import type {
   MlForecastResultDTO,
   MlRunBaselineInputDTO,
   MlRunBaselineResultDTO,
+  ProfileListResultDTO,
+  ProfileCreateInputDTO,
+  ProfileSetActiveInputDTO,
+  ProfileSettingsDTO,
   ReportExportInputDTO,
   ReportExportResultDTO,
   ReportGenerateInputDTO,
   ReportGenerateResultDTO,
+  SettingsUpdateInputDTO,
   SyncCommandResultDTO,
   SyncResumeInputDTO,
   SyncStartInputDTO,
@@ -63,6 +70,54 @@ export async function setDataMode(input: SetDataModeInputDTO): Promise<DataModeS
 export async function probeDataMode(input: DataModeProbeInputDTO): Promise<DataModeProbeResultDTO> {
   const api = ensureElectronApi();
   const result = await api.appProbeDataMode(input);
+  return unwrapResult(result);
+}
+
+export async function fetchProfiles(): Promise<ProfileListResultDTO> {
+  const api = ensureElectronApi();
+  const result = await api.profileList();
+  return unwrapResult(result);
+}
+
+export async function createProfile(input: ProfileCreateInputDTO): Promise<ProfileListResultDTO> {
+  const api = ensureElectronApi();
+  const result = await api.profileCreate(input);
+  return unwrapResult(result);
+}
+
+export async function setActiveProfile(input: ProfileSetActiveInputDTO): Promise<ProfileListResultDTO> {
+  const api = ensureElectronApi();
+  const result = await api.profileSetActive(input);
+  return unwrapResult(result);
+}
+
+export async function fetchProfileSettings(): Promise<ProfileSettingsDTO> {
+  const api = ensureElectronApi();
+  const result = await api.settingsGet();
+  return unwrapResult(result);
+}
+
+export async function updateProfileSettings(input: SettingsUpdateInputDTO): Promise<ProfileSettingsDTO> {
+  const api = ensureElectronApi();
+  const result = await api.settingsUpdate(input);
+  return unwrapResult(result);
+}
+
+export async function fetchAuthStatus(): Promise<AuthStatusDTO> {
+  const api = ensureElectronApi();
+  const result = await api.authGetStatus();
+  return unwrapResult(result);
+}
+
+export async function connectAuth(input: AuthConnectInputDTO): Promise<AuthStatusDTO> {
+  const api = ensureElectronApi();
+  const result = await api.authConnect(input);
+  return unwrapResult(result);
+}
+
+export async function disconnectAuth(): Promise<AuthStatusDTO> {
+  const api = ensureElectronApi();
+  const result = await api.authDisconnect();
   return unwrapResult(result);
 }
 

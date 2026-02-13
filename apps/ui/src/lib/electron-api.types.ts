@@ -3,6 +3,8 @@ import type {
   DataModeProbeResult,
   DataModeStatusResult,
   SetDataModeInputDTO,
+  AuthConnectInputDTO,
+  AuthStatusResult,
   AppStatusResult,
   ChannelIdDTO,
   ChannelInfoResult,
@@ -12,10 +14,15 @@ import type {
   MlForecastResult,
   MlRunBaselineInputDTO,
   MlRunBaselineResult,
+  ProfileCreateInputDTO,
+  ProfileListResult,
+  ProfileSetActiveInputDTO,
+  ProfileSettingsResult,
   ReportExportInputDTO,
   ReportExportResult,
   ReportGenerateInputDTO,
   ReportGenerateResult,
+  SettingsUpdateInputDTO,
   SyncCommandResult,
   SyncCompleteEvent,
   SyncErrorEvent,
@@ -31,6 +38,14 @@ export interface ElectronAPI {
   appGetDataMode: () => Promise<DataModeStatusResult>;
   appSetDataMode: (input: SetDataModeInputDTO) => Promise<DataModeStatusResult>;
   appProbeDataMode: (input: DataModeProbeInputDTO) => Promise<DataModeProbeResult>;
+  profileList: () => Promise<ProfileListResult>;
+  profileCreate: (input: ProfileCreateInputDTO) => Promise<ProfileListResult>;
+  profileSetActive: (input: ProfileSetActiveInputDTO) => Promise<ProfileListResult>;
+  settingsGet: () => Promise<ProfileSettingsResult>;
+  settingsUpdate: (input: SettingsUpdateInputDTO) => Promise<ProfileSettingsResult>;
+  authGetStatus: () => Promise<AuthStatusResult>;
+  authConnect: (input: AuthConnectInputDTO) => Promise<AuthStatusResult>;
+  authDisconnect: () => Promise<AuthStatusResult>;
   syncStart: (input: SyncStartInputDTO) => Promise<SyncCommandResult>;
   syncResume: (input: SyncResumeInputDTO) => Promise<SyncCommandResult>;
   mlRunBaseline: (input: MlRunBaselineInputDTO) => Promise<MlRunBaselineResult>;

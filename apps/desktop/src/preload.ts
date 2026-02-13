@@ -3,6 +3,8 @@
   DataModeProbeInputDTOSchema,
   DataModeProbeResultSchema,
   DataModeStatusResultSchema,
+  AuthConnectInputDTOSchema,
+  AuthStatusResultSchema,
   SetDataModeInputDTOSchema,
   AppStatusResultSchema,
   ChannelIdDTOSchema,
@@ -16,10 +18,15 @@
   MlForecastResultSchema,
   MlRunBaselineInputDTOSchema,
   MlRunBaselineResultSchema,
+  ProfileCreateInputDTOSchema,
+  ProfileListResultSchema,
+  ProfileSetActiveInputDTOSchema,
+  ProfileSettingsResultSchema,
   ReportExportInputDTOSchema,
   ReportExportResultSchema,
   ReportGenerateInputDTOSchema,
   ReportGenerateResultSchema,
+  SettingsUpdateInputDTOSchema,
   SyncCommandResultSchema,
   SyncCompleteEventSchema,
   SyncErrorEventSchema,
@@ -33,6 +40,8 @@
   type DataModeStatusResult,
   type SetDataModeInputDTO,
   type AppStatusResult,
+  type AuthConnectInputDTO,
+  type AuthStatusResult,
   type ChannelIdDTO,
   type ChannelInfoResult,
   type KpiQueryDTO,
@@ -41,10 +50,15 @@
   type MlForecastResult,
   type MlRunBaselineInputDTO,
   type MlRunBaselineResult,
+  type ProfileCreateInputDTO,
+  type ProfileListResult,
+  type ProfileSetActiveInputDTO,
+  type ProfileSettingsResult,
   type ReportExportInputDTO,
   type ReportExportResult,
   type ReportGenerateInputDTO,
   type ReportGenerateResult,
+  type SettingsUpdateInputDTO,
   type SyncCommandResult,
   type SyncCompleteEvent,
   type SyncErrorEvent,
@@ -62,6 +76,14 @@ export interface ElectronAPI {
   appGetDataMode: () => Promise<DataModeStatusResult>;
   appSetDataMode: (input: SetDataModeInputDTO) => Promise<DataModeStatusResult>;
   appProbeDataMode: (input: DataModeProbeInputDTO) => Promise<DataModeProbeResult>;
+  profileList: () => Promise<ProfileListResult>;
+  profileCreate: (input: ProfileCreateInputDTO) => Promise<ProfileListResult>;
+  profileSetActive: (input: ProfileSetActiveInputDTO) => Promise<ProfileListResult>;
+  settingsGet: () => Promise<ProfileSettingsResult>;
+  settingsUpdate: (input: SettingsUpdateInputDTO) => Promise<ProfileSettingsResult>;
+  authGetStatus: () => Promise<AuthStatusResult>;
+  authConnect: (input: AuthConnectInputDTO) => Promise<AuthStatusResult>;
+  authDisconnect: () => Promise<AuthStatusResult>;
   syncStart: (input: SyncStartInputDTO) => Promise<SyncCommandResult>;
   syncResume: (input: SyncResumeInputDTO) => Promise<SyncCommandResult>;
   mlRunBaseline: (input: MlRunBaselineInputDTO) => Promise<MlRunBaselineResult>;
@@ -176,6 +198,62 @@ const api: ElectronAPI = {
       input,
       DataModeProbeInputDTOSchema,
       DataModeProbeResultSchema,
+    ),
+  profileList: () =>
+    invokeValidated(
+      IPC_CHANNELS.PROFILE_LIST,
+      undefined,
+      EmptyPayloadSchema,
+      ProfileListResultSchema,
+    ),
+  profileCreate: (input) =>
+    invokeValidated(
+      IPC_CHANNELS.PROFILE_CREATE,
+      input,
+      ProfileCreateInputDTOSchema,
+      ProfileListResultSchema,
+    ),
+  profileSetActive: (input) =>
+    invokeValidated(
+      IPC_CHANNELS.PROFILE_SET_ACTIVE,
+      input,
+      ProfileSetActiveInputDTOSchema,
+      ProfileListResultSchema,
+    ),
+  settingsGet: () =>
+    invokeValidated(
+      IPC_CHANNELS.SETTINGS_GET,
+      undefined,
+      EmptyPayloadSchema,
+      ProfileSettingsResultSchema,
+    ),
+  settingsUpdate: (input) =>
+    invokeValidated(
+      IPC_CHANNELS.SETTINGS_UPDATE,
+      input,
+      SettingsUpdateInputDTOSchema,
+      ProfileSettingsResultSchema,
+    ),
+  authGetStatus: () =>
+    invokeValidated(
+      IPC_CHANNELS.AUTH_GET_STATUS,
+      undefined,
+      EmptyPayloadSchema,
+      AuthStatusResultSchema,
+    ),
+  authConnect: (input) =>
+    invokeValidated(
+      IPC_CHANNELS.AUTH_CONNECT,
+      input,
+      AuthConnectInputDTOSchema,
+      AuthStatusResultSchema,
+    ),
+  authDisconnect: () =>
+    invokeValidated(
+      IPC_CHANNELS.AUTH_DISCONNECT,
+      undefined,
+      EmptyPayloadSchema,
+      AuthStatusResultSchema,
     ),
   syncStart: (input) =>
     invokeValidated(

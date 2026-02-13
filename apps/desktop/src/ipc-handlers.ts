@@ -10,6 +10,9 @@ import {
   ChannelIdDTOSchema,
   ChannelInfoDTOSchema,
   ChannelInfoResultSchema,
+  AuthConnectInputDTOSchema,
+  AuthStatusDTOSchema,
+  AuthStatusResultSchema,
   EmptyPayloadSchema,
   IPC_CHANNELS,
   KpiQueryDTOSchema,
@@ -21,12 +24,19 @@ import {
   MlRunBaselineInputDTOSchema,
   MlRunBaselineResultDTOSchema,
   MlRunBaselineResultSchema,
+  ProfileCreateInputDTOSchema,
+  ProfileListResultDTOSchema,
+  ProfileListResultSchema,
+  ProfileSetActiveInputDTOSchema,
+  ProfileSettingsDTOSchema,
+  ProfileSettingsResultSchema,
   ReportExportInputDTOSchema,
   ReportExportResultDTOSchema,
   ReportExportResultSchema,
   ReportGenerateInputDTOSchema,
   ReportGenerateResultDTOSchema,
   ReportGenerateResultSchema,
+  SettingsUpdateInputDTOSchema,
   SyncCommandResultDTOSchema,
   SyncCommandResultSchema,
   SyncResumeInputDTOSchema,
@@ -43,6 +53,9 @@ import {
   type SetDataModeInputDTO,
   type AppStatusDTO,
   type AppStatusResult,
+  type AuthConnectInputDTO,
+  type AuthStatusDTO,
+  type AuthStatusResult,
   type ChannelInfoDTO,
   type ChannelInfoResult,
   type IpcResult,
@@ -55,6 +68,12 @@ import {
   type MlRunBaselineInputDTO,
   type MlRunBaselineResult,
   type MlRunBaselineResultDTO,
+  type ProfileCreateInputDTO,
+  type ProfileListResult,
+  type ProfileListResultDTO,
+  type ProfileSetActiveInputDTO,
+  type ProfileSettingsDTO,
+  type ProfileSettingsResult,
   type ReportExportInputDTO,
   type ReportExportResult,
   type ReportExportResultDTO,
@@ -66,6 +85,7 @@ import {
   type SyncCommandResultDTO,
   type SyncResumeInputDTO,
   type SyncStartInputDTO,
+  type SettingsUpdateInputDTO,
   type TimeseriesQueryDTO,
   type TimeseriesResult,
   type TimeseriesResultDTO,
@@ -77,6 +97,14 @@ export interface DesktopIpcBackend {
   getDataModeStatus: () => Result<DataModeStatusDTO, AppError>;
   setDataMode: (input: SetDataModeInputDTO) => Result<DataModeStatusDTO, AppError>;
   probeDataMode: (input: DataModeProbeInputDTO) => Result<DataModeProbeResultDTO, AppError>;
+  listProfiles: () => Result<ProfileListResultDTO, AppError>;
+  createProfile: (input: ProfileCreateInputDTO) => Result<ProfileListResultDTO, AppError>;
+  setActiveProfile: (input: ProfileSetActiveInputDTO) => Result<ProfileListResultDTO, AppError>;
+  getProfileSettings: () => Result<ProfileSettingsDTO, AppError>;
+  updateProfileSettings: (input: SettingsUpdateInputDTO) => Result<ProfileSettingsDTO, AppError>;
+  getAuthStatus: () => Result<AuthStatusDTO, AppError>;
+  connectAuth: (input: AuthConnectInputDTO) => Result<AuthStatusDTO, AppError>;
+  disconnectAuth: () => Result<AuthStatusDTO, AppError>;
   startSync: (input: SyncStartInputDTO) => Result<SyncCommandResultDTO, AppError> | Promise<Result<SyncCommandResultDTO, AppError>>;
   resumeSync: (input: SyncResumeInputDTO) => Result<SyncCommandResultDTO, AppError> | Promise<Result<SyncCommandResultDTO, AppError>>;
   runMlBaseline: (input: MlRunBaselineInputDTO) => Result<MlRunBaselineResultDTO, AppError> | Promise<Result<MlRunBaselineResultDTO, AppError>>;
@@ -250,6 +278,86 @@ export function handleAppProbeDataMode(backend: DesktopIpcBackend, payload: unkn
   );
 }
 
+export function handleProfileList(backend: DesktopIpcBackend, payload: unknown): ProfileListResult {
+  return runHandler(
+    payload,
+    EmptyPayloadSchema,
+    ProfileListResultDTOSchema,
+    ProfileListResultSchema,
+    () => backend.listProfiles(),
+  );
+}
+
+export function handleProfileCreate(backend: DesktopIpcBackend, payload: unknown): ProfileListResult {
+  return runHandler(
+    payload,
+    ProfileCreateInputDTOSchema,
+    ProfileListResultDTOSchema,
+    ProfileListResultSchema,
+    (input) => backend.createProfile(input),
+  );
+}
+
+export function handleProfileSetActive(backend: DesktopIpcBackend, payload: unknown): ProfileListResult {
+  return runHandler(
+    payload,
+    ProfileSetActiveInputDTOSchema,
+    ProfileListResultDTOSchema,
+    ProfileListResultSchema,
+    (input) => backend.setActiveProfile(input),
+  );
+}
+
+export function handleSettingsGet(backend: DesktopIpcBackend, payload: unknown): ProfileSettingsResult {
+  return runHandler(
+    payload,
+    EmptyPayloadSchema,
+    ProfileSettingsDTOSchema,
+    ProfileSettingsResultSchema,
+    () => backend.getProfileSettings(),
+  );
+}
+
+export function handleSettingsUpdate(backend: DesktopIpcBackend, payload: unknown): ProfileSettingsResult {
+  return runHandler(
+    payload,
+    SettingsUpdateInputDTOSchema,
+    ProfileSettingsDTOSchema,
+    ProfileSettingsResultSchema,
+    (input) => backend.updateProfileSettings(input),
+  );
+}
+
+export function handleAuthGetStatus(backend: DesktopIpcBackend, payload: unknown): AuthStatusResult {
+  return runHandler(
+    payload,
+    EmptyPayloadSchema,
+    AuthStatusDTOSchema,
+    AuthStatusResultSchema,
+    () => backend.getAuthStatus(),
+  );
+}
+
+export function handleAuthConnect(backend: DesktopIpcBackend, payload: unknown): AuthStatusResult {
+  return runHandler(
+    payload,
+    AuthConnectInputDTOSchema,
+    AuthStatusDTOSchema,
+    AuthStatusResultSchema,
+    (input) => backend.connectAuth(input),
+  );
+}
+
+export function handleAuthDisconnect(backend: DesktopIpcBackend, payload: unknown): AuthStatusResult {
+  return runHandler(
+    payload,
+    EmptyPayloadSchema,
+    AuthStatusDTOSchema,
+    AuthStatusResultSchema,
+    () => backend.disconnectAuth(),
+  );
+}
+
 export async function handleSyncStart(
   backend: DesktopIpcBackend,
   payload: unknown,
@@ -363,6 +471,14 @@ export function registerIpcHandlers(ipcMain: IpcMainLike, backend: DesktopIpcBac
   ipcMain.handle(IPC_CHANNELS.APP_GET_DATA_MODE, (_event, payload) => handleAppGetDataMode(backend, payload));
   ipcMain.handle(IPC_CHANNELS.APP_SET_DATA_MODE, (_event, payload) => handleAppSetDataMode(backend, payload));
   ipcMain.handle(IPC_CHANNELS.APP_PROBE_DATA_MODE, (_event, payload) => handleAppProbeDataMode(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.PROFILE_LIST, (_event, payload) => handleProfileList(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.PROFILE_CREATE, (_event, payload) => handleProfileCreate(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.PROFILE_SET_ACTIVE, (_event, payload) => handleProfileSetActive(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_event, payload) => handleSettingsGet(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_UPDATE, (_event, payload) => handleSettingsUpdate(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.AUTH_GET_STATUS, (_event, payload) => handleAuthGetStatus(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.AUTH_CONNECT, (_event, payload) => handleAuthConnect(backend, payload));
+  ipcMain.handle(IPC_CHANNELS.AUTH_DISCONNECT, (_event, payload) => handleAuthDisconnect(backend, payload));
   ipcMain.handle(IPC_CHANNELS.SYNC_START, (_event, payload) => handleSyncStart(backend, payload));
   ipcMain.handle(IPC_CHANNELS.SYNC_RESUME, (_event, payload) => handleSyncResume(backend, payload));
   ipcMain.handle(IPC_CHANNELS.ML_RUN_BASELINE, (_event, payload) => handleMlRunBaseline(backend, payload));

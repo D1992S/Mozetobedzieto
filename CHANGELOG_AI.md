@@ -625,3 +625,55 @@ Dziennik zmian wykonywanych przez modele AI.
   - `http://localhost:5173` — HTTP 200.
 - Nastepny krok:
   - Kontynuowac Faze 8 zgodnie z `NEXT_STEP.md`.
+
+## 2026-02-13 (v19)
+
+- Data: 2026-02-13
+- Autor (model): GPT-5 Codex
+- Zakres plikow:
+  - `apps/desktop/src/main.ts`
+  - `apps/desktop/src/profile-manager.ts`
+  - `apps/desktop/src/profile-manager.integration.test.ts`
+  - `apps/desktop/src/ipc-handlers.ts`
+  - `apps/desktop/src/ipc-handlers.integration.test.ts`
+  - `apps/desktop/src/preload.ts`
+  - `apps/ui/src/lib/electron-api.types.ts`
+  - `apps/ui/src/lib/electron-api.ts`
+  - `apps/ui/src/hooks/use-dashboard-data.ts`
+  - `apps/ui/src/App.tsx`
+  - `packages/core/src/queries/settings-queries.ts`
+  - `packages/core/src/queries/index.ts`
+  - `packages/core/src/index.ts`
+  - `packages/core/src/data-core.integration.test.ts`
+  - `packages/shared/src/ipc/contracts.ts`
+  - `packages/shared/src/ipc/contracts.test.ts`
+  - `packages/shared/src/dto/index.ts`
+  - `packages/shared/src/index.ts`
+  - `README.md`, `NEXT_STEP.md`, `docs/PLAN_REALIZACJI.md`, `docs/architecture/data-flow.md`, `CHANGELOG_AI.md`
+- Co zmieniono:
+  - Domknieto Faze 8 (Auth + Profile + Settings) end-to-end.
+  - Podlaczono profile manager do desktop runtime:
+    - oddzielna baza SQLite per profil,
+    - przelaczanie aktywnego profilu z przeladowaniem backendu,
+    - synchronizacja aktywnego profilu do tabeli `profiles` w aktywnej DB.
+  - Dodano query layer ustawien (`createSettingsQueries`) i komendy IPC settings/auth/profile.
+  - Rozszerzono preload + UI API + hooki React Query o profile/settings/auth.
+  - Rozszerzono UI o sekcje:
+    - profile (lista, utworz, aktywuj),
+    - konto YouTube (status/connect/disconnect),
+    - ustawienia per profil.
+  - Dodano testy integracyjne profile managera (persistencja po restarcie, izolacja ustawien per profil, brak plaintext sekretu).
+  - Rozszerzono testy integracyjne IPC desktop o nowe handlery fazy 8.
+  - Ujednolicono dokumentacje: Faza 8 = DONE, Faza 9 = NASTEPNA.
+- Dlaczego:
+  - Celem bylo dostarczenie kompletnej separacji danych per profil i bezpiecznego przechowywania auth, zgodnie z DoD Fazy 8.
+- Ryzyko/regresja:
+  - Lokalnie nadal wystepuje warning engines (`node >=22`, aktualnie `20.x`), mimo ze wszystkie checki przechodza.
+  - Zmiana aktywnego profilu przeladowuje backend (chwilowe odswiezenie stanu UI jest oczekiwane).
+- Jak zweryfikowano:
+  - `pnpm lint` - PASS.
+  - `pnpm typecheck` - PASS.
+  - `pnpm test` - PASS (`72/72`, w tym nowe testy profile-manager + rozszerzone IPC).
+  - `pnpm build` - PASS.
+- Nastepny krok:
+  - Faza 9: Import + Enrichment + Search (CSV import + walidacja + trigger pipeline + FTS5 search z snippet/relevance).

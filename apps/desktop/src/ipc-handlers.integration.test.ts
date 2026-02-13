@@ -1,4 +1,4 @@
-import { fileURLToPath } from 'node:url';
+﻿import { fileURLToPath } from 'node:url';
 import {
   createChannelQueries,
   createDatabaseConnection,
@@ -7,22 +7,30 @@ import {
   runMigrations,
   seedDatabaseFromFixture,
 } from '@moze/core';
-import { AppError, err, ok, type AppStatusDTO } from '@moze/shared';
+import { AppError, err, ok, type AppStatusDTO, type ProfileSettingsDTO } from '@moze/shared';
 import { describe, expect, it } from 'vitest';
 import {
   handleAppGetDataMode,
-  handleAppProbeDataMode,
-  handleMlGetForecast,
-  handleMlRunBaseline,
-  handleReportsExport,
-  handleReportsGenerate,
-  handleSyncResume,
-  handleSyncStart,
-  handleAppSetDataMode,
   handleAppGetStatus,
+  handleAppProbeDataMode,
+  handleAppSetDataMode,
+  handleAuthConnect,
+  handleAuthDisconnect,
+  handleAuthGetStatus,
   handleDbGetChannelInfo,
   handleDbGetKpis,
   handleDbGetTimeseries,
+  handleMlGetForecast,
+  handleMlRunBaseline,
+  handleProfileCreate,
+  handleProfileList,
+  handleProfileSetActive,
+  handleReportsExport,
+  handleReportsGenerate,
+  handleSettingsGet,
+  handleSettingsUpdate,
+  handleSyncResume,
+  handleSyncStart,
   type DesktopIpcBackend,
 } from './ipc-handlers.ts';
 
@@ -69,12 +77,59 @@ function createTestContext(): TestContext {
     throw new Error('Brak danych fixture.');
   }
 
+  const createdAt = '2026-02-12T20:00:00.000Z';
+  const updatedAt = '2026-02-12T20:00:00.000Z';
+  let profileCounter = 1;
+  let activeProfileId = fixtureResult.value.profile.id;
+  let profiles: Array<{
+    id: string;
+    name: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }> = [
+    {
+      id: activeProfileId,
+      name: fixtureResult.value.profile.name,
+      isActive: true,
+      createdAt,
+      updatedAt,
+    },
+  ];
+
+  let settings: ProfileSettingsDTO = {
+    defaultChannelId: fixtureResult.value.channel.channelId,
+    preferredForecastMetric: 'views' as const,
+    defaultDatePreset: '30d' as const,
+    autoRunSync: false,
+    autoRunMl: false,
+    reportFormats: ['json', 'csv', 'html'] as Array<'json' | 'csv' | 'html'>,
+    language: 'pl' as const,
+  };
+
+  let authStatus = {
+    connected: false,
+    provider: null as 'youtube' | null,
+    accountLabel: null as string | null,
+    connectedAt: null as string | null,
+    storage: 'safeStorage' as const,
+  };
+
+  const syncProfileFlags = (nextActiveProfileId: string): void => {
+    activeProfileId = nextActiveProfileId;
+    profiles = profiles.map((profile) => ({
+      ...profile,
+      isActive: profile.id === nextActiveProfileId,
+      updatedAt: profile.id === nextActiveProfileId ? '2026-02-12T21:00:00.000Z' : profile.updatedAt,
+    }));
+  };
+
   const backend: DesktopIpcBackend = {
     getAppStatus: () =>
       ok<AppStatusDTO>({
         version: '0.0.1-test',
         dbReady: true,
-        profileId: fixtureResult.value.profile.id,
+        profileId: activeProfileId,
         syncRunning: false,
         lastSyncAt: fixtureResult.value.channel.lastSyncAt ?? null,
       }),
@@ -99,6 +154,82 @@ function createTestContext(): TestContext {
         videoStats: input.videoIds.length,
         recordFilePath: null,
       }),
+    listProfiles: () =>
+      ok({
+        activeProfileId,
+        profiles,
+      }),
+    createProfile: (input) => {
+      profileCounter += 1;
+      const newProfileId = `PROFILE-TEST-${String(profileCounter).padStart(3, '0')}`;
+      const nowIso = `2026-02-12T2${String(profileCounter % 10)}:00:00.000Z`;
+      profiles = [
+        ...profiles,
+        {
+          id: newProfileId,
+          name: input.name,
+          isActive: false,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        },
+      ];
+      if (input.setActive) {
+        syncProfileFlags(newProfileId);
+      }
+
+      return ok({
+        activeProfileId,
+        profiles,
+      });
+    },
+    setActiveProfile: (input) => {
+      const foundProfile = profiles.find((profile) => profile.id === input.profileId);
+      if (!foundProfile) {
+        return err(
+          AppError.create(
+            'PROFILE_NOT_FOUND',
+            'Nie znaleziono profilu o podanym identyfikatorze.',
+            'error',
+            { profileId: input.profileId },
+          ),
+        );
+      }
+
+      syncProfileFlags(foundProfile.id);
+      return ok({
+        activeProfileId,
+        profiles,
+      });
+    },
+    getProfileSettings: () => ok(settings),
+    updateProfileSettings: (input) => {
+      settings = {
+        ...settings,
+        ...input.settings,
+      };
+      return ok(settings);
+    },
+    getAuthStatus: () => ok(authStatus),
+    connectAuth: (input) => {
+      authStatus = {
+        connected: true,
+        provider: input.provider,
+        accountLabel: input.accountLabel,
+        connectedAt: '2026-02-12T22:00:00.000Z',
+        storage: 'safeStorage',
+      };
+      return ok(authStatus);
+    },
+    disconnectAuth: () => {
+      authStatus = {
+        connected: false,
+        provider: null,
+        accountLabel: null,
+        connectedAt: null,
+        storage: 'safeStorage',
+      };
+      return ok(authStatus);
+    },
     startSync: () =>
       ok({
         syncRunId: 1,
@@ -155,7 +286,7 @@ function createTestContext(): TestContext {
         generatedAt: '2026-02-12T22:30:00.000Z',
         channel: {
           channelId: input.channelId,
-          name: 'Kanał testowy',
+          name: 'Kanal testowy',
         },
         range: {
           dateFrom: input.dateFrom,
@@ -202,8 +333,8 @@ function createTestContext(): TestContext {
         insights: [
           {
             code: 'INSIGHT_VIEWS_POSITIVE',
-            title: 'Wyświetlenia rosną',
-            description: 'Kanał zanotował dodatnią zmianę wyświetleń.',
+            title: 'Wyswietlenia rosna',
+            description: 'Kanal zanotowal dodatnia zmiane wyswietlen.',
             severity: 'good',
           },
         ],
@@ -235,15 +366,11 @@ function createTestContext(): TestContext {
 }
 
 describe('Desktop IPC handlers integration', () => {
-  it('returns happy-path results for app status, kpis, timeseries and channel info', async () => {
+  it('returns happy-path results for app/profile/settings/auth/sync/ml/reports/db handlers', async () => {
     const ctx = createTestContext();
 
     const statusResult = handleAppGetStatus(ctx.backend, undefined);
     expect(statusResult.ok).toBe(true);
-    if (!statusResult.ok) {
-      ctx.close();
-      return;
-    }
 
     const modeResult = handleAppGetDataMode(ctx.backend, undefined);
     expect(modeResult.ok).toBe(true);
@@ -265,6 +392,75 @@ describe('Desktop IPC handlers integration', () => {
     expect(probeModeResult.ok).toBe(true);
     if (probeModeResult.ok) {
       expect(probeModeResult.value.videoStats).toBe(2);
+    }
+
+    const profileListResult = handleProfileList(ctx.backend, undefined);
+    expect(profileListResult.ok).toBe(true);
+    if (profileListResult.ok) {
+      expect(profileListResult.value.profiles.length).toBeGreaterThan(0);
+    }
+
+    const profileCreateResult = handleProfileCreate(ctx.backend, {
+      name: 'Nowy profil testowy',
+      setActive: true,
+    });
+    expect(profileCreateResult.ok).toBe(true);
+    if (profileCreateResult.ok) {
+      expect(profileCreateResult.value.activeProfileId).not.toBeNull();
+    }
+
+    let switchedProfileId: string | null = null;
+    if (profileCreateResult.ok) {
+      switchedProfileId = profileCreateResult.value.profiles[0]?.id ?? null;
+    }
+
+    if (switchedProfileId) {
+      const profileSetActiveResult = handleProfileSetActive(ctx.backend, {
+        profileId: switchedProfileId,
+      });
+      expect(profileSetActiveResult.ok).toBe(true);
+    }
+
+    const settingsGetResult = handleSettingsGet(ctx.backend, undefined);
+    expect(settingsGetResult.ok).toBe(true);
+    if (settingsGetResult.ok) {
+      expect(settingsGetResult.value.language).toBe('pl');
+    }
+
+    const settingsUpdateResult = handleSettingsUpdate(ctx.backend, {
+      settings: {
+        defaultDatePreset: '7d',
+        autoRunSync: true,
+      },
+    });
+    expect(settingsUpdateResult.ok).toBe(true);
+    if (settingsUpdateResult.ok) {
+      expect(settingsUpdateResult.value.defaultDatePreset).toBe('7d');
+      expect(settingsUpdateResult.value.autoRunSync).toBe(true);
+    }
+
+    const authStatusResult = handleAuthGetStatus(ctx.backend, undefined);
+    expect(authStatusResult.ok).toBe(true);
+    if (authStatusResult.ok) {
+      expect(authStatusResult.value.connected).toBe(false);
+    }
+
+    const authConnectResult = handleAuthConnect(ctx.backend, {
+      provider: 'youtube',
+      accountLabel: 'Konto testowe',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+    });
+    expect(authConnectResult.ok).toBe(true);
+    if (authConnectResult.ok) {
+      expect(authConnectResult.value.connected).toBe(true);
+      expect(authConnectResult.value.provider).toBe('youtube');
+    }
+
+    const authDisconnectResult = handleAuthDisconnect(ctx.backend, undefined);
+    expect(authDisconnectResult.ok).toBe(true);
+    if (authDisconnectResult.ok) {
+      expect(authDisconnectResult.value.connected).toBe(false);
     }
 
     const startSyncResult = await handleSyncStart(ctx.backend, {
@@ -334,7 +530,6 @@ describe('Desktop IPC handlers integration', () => {
       dateFrom: ctx.dateFrom,
       dateTo: ctx.dateTo,
     });
-
     expect(kpiResult.ok).toBe(true);
     if (kpiResult.ok) {
       expect(kpiResult.value.views).toBeGreaterThan(0);
@@ -347,7 +542,6 @@ describe('Desktop IPC handlers integration', () => {
       dateTo: ctx.dateTo,
       granularity: 'day',
     });
-
     expect(timeseriesResult.ok).toBe(true);
     if (timeseriesResult.ok) {
       expect(timeseriesResult.value.points.length).toBeGreaterThan(0);
@@ -370,7 +564,6 @@ describe('Desktop IPC handlers integration', () => {
       dateFrom: 'niepoprawna-data',
       dateTo: ctx.dateTo,
     });
-
     expect(invalidPayloadResult.ok).toBe(false);
     if (!invalidPayloadResult.ok) {
       expect(invalidPayloadResult.error.code).toBe('IPC_INVALID_PAYLOAD');
@@ -379,7 +572,6 @@ describe('Desktop IPC handlers integration', () => {
     const invalidStatusPayloadResult = handleAppGetStatus(ctx.backend, {
       unexpected: true,
     });
-
     expect(invalidStatusPayloadResult.ok).toBe(false);
     if (!invalidStatusPayloadResult.ok) {
       expect(invalidStatusPayloadResult.error.code).toBe('IPC_INVALID_PAYLOAD');
@@ -389,6 +581,47 @@ describe('Desktop IPC handlers integration', () => {
     expect(invalidSetMode.ok).toBe(false);
     if (!invalidSetMode.ok) {
       expect(invalidSetMode.error.code).toBe('IPC_INVALID_PAYLOAD');
+    }
+
+    const invalidProfileCreate = handleProfileCreate(ctx.backend, {
+      setActive: true,
+    });
+    expect(invalidProfileCreate.ok).toBe(false);
+    if (!invalidProfileCreate.ok) {
+      expect(invalidProfileCreate.error.code).toBe('IPC_INVALID_PAYLOAD');
+    }
+
+    const invalidProfileSetActive = handleProfileSetActive(ctx.backend, {
+      profileId: '',
+    });
+    expect(invalidProfileSetActive.ok).toBe(false);
+    if (!invalidProfileSetActive.ok) {
+      expect(invalidProfileSetActive.error.code).toBe('IPC_INVALID_PAYLOAD');
+    }
+
+    const invalidSettingsUpdate = handleSettingsUpdate(ctx.backend, {
+      settings: { defaultDatePreset: '120d' },
+    });
+    expect(invalidSettingsUpdate.ok).toBe(false);
+    if (!invalidSettingsUpdate.ok) {
+      expect(invalidSettingsUpdate.error.code).toBe('IPC_INVALID_PAYLOAD');
+    }
+
+    const invalidAuthConnect = handleAuthConnect(ctx.backend, {
+      provider: 'youtube',
+      accountLabel: 'konto',
+    });
+    expect(invalidAuthConnect.ok).toBe(false);
+    if (!invalidAuthConnect.ok) {
+      expect(invalidAuthConnect.error.code).toBe('IPC_INVALID_PAYLOAD');
+    }
+
+    const invalidAuthDisconnectPayload = handleAuthDisconnect(ctx.backend, {
+      unexpected: true,
+    });
+    expect(invalidAuthDisconnectPayload.ok).toBe(false);
+    if (!invalidAuthDisconnectPayload.ok) {
+      expect(invalidAuthDisconnectPayload.error.code).toBe('IPC_INVALID_PAYLOAD');
     }
 
     const invalidSyncStart = await handleSyncStart(ctx.backend, { recentLimit: 10 });
@@ -415,7 +648,7 @@ describe('Desktop IPC handlers integration', () => {
     ctx.close();
   });
 
-  it('returns core error without crash when core layer fails', () => {
+  it('returns core/backend error without crash', () => {
     const ctx = createTestContext();
 
     const coreErrorResult = handleDbGetKpis(ctx.backend, {
@@ -423,7 +656,6 @@ describe('Desktop IPC handlers integration', () => {
       dateFrom: ctx.dateTo,
       dateTo: ctx.dateFrom,
     });
-
     expect(coreErrorResult.ok).toBe(false);
     if (!coreErrorResult.ok) {
       expect(coreErrorResult.error.code).toBe('DB_INVALID_DATE_RANGE');
@@ -434,6 +666,14 @@ describe('Desktop IPC handlers integration', () => {
       getDataModeStatus: () => ctx.backend.getDataModeStatus(),
       setDataMode: (input) => ctx.backend.setDataMode(input),
       probeDataMode: (input) => ctx.backend.probeDataMode(input),
+      listProfiles: () => ctx.backend.listProfiles(),
+      createProfile: (input) => ctx.backend.createProfile(input),
+      setActiveProfile: (input) => ctx.backend.setActiveProfile(input),
+      getProfileSettings: () => ctx.backend.getProfileSettings(),
+      updateProfileSettings: (input) => ctx.backend.updateProfileSettings(input),
+      getAuthStatus: () => ctx.backend.getAuthStatus(),
+      connectAuth: (input) => ctx.backend.connectAuth(input),
+      disconnectAuth: () => ctx.backend.disconnectAuth(),
       startSync: (input) => ctx.backend.startSync(input),
       resumeSync: (input) => ctx.backend.resumeSync(input),
       runMlBaseline: (input) => ctx.backend.runMlBaseline(input),

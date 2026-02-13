@@ -1,4 +1,4 @@
-# Nastepny krok — PRZECZYTAJ NAJPIERW
+﻿# Nastepny krok - PRZECZYTAJ NAJPIERW
 
 > **Ten plik mowi Ci co robic teraz.** Aktualizuj go na koncu kazdej sesji.
 
@@ -14,88 +14,88 @@
 | 5 | Sync Orchestrator | DONE |
 | 6 | Bazowy ML Framework | DONE |
 | 7 | Dashboard + Raporty + Eksport | DONE |
-| 8 | Auth + Profile + Settings | **NASTEPNA** |
-| 9-19 | Reszta | Oczekuje |
+| 8 | Auth + Profile + Settings | DONE |
+| 9 | Import + Enrichment + Search | **NASTEPNA** |
+| 10-19 | Reszta | Oczekuje |
 
-## Co zostalo zrobione (Faza 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7)
+## Co zostalo zrobione (Faza 8)
 
-- Monorepo pnpm workspaces: 10 pakietow + 2 aplikacje.
-- TypeScript 5.9 strict, ESLint 9, Prettier, Vitest 4.
-- `shared`:
-  - `Result<T,E>`, `AppError`, logger JSON, Zod 4 DTO.
-  - IPC kontrakty dla status/data-mode/sync/ml/reports + eventy sync.
-- `core`:
-  - SQLite (`better-sqlite3`) + migracje forward-only.
-  - Query/mutation layer + fixture seed (90 dni, 1 kanal, 50 filmow).
-- `data-pipeline`:
-  - ETL runner (`runDataPipeline`) + validation + staging + `ml_features` + `data_lineage`.
-- `sync`:
-  - orchestrator z checkpoint/resume, mutex, retry/backoff i eventami progress.
-- `ml`:
-  - baseline forecasting: `holt-winters` + `linear-regression`,
-  - backtesting (`MAE`, `sMAPE`, `MASE`) + quality gate + `p10/p50/p90`.
-- `reports` (Faza 7):
-  - generator raportu dashboardowego (`generateDashboardReport`),
-  - eksport lokalny (`exportDashboardReport`) do `JSON/CSV/HTML`,
-  - renderer HTML raportu.
-- `desktop` + `ui` (Faza 7):
-  - nowe komendy IPC:
-    - `reports:generate`
-    - `reports:export`
-  - dashboard z:
-    - kartami KPI (delta + trend),
-    - wykresem timeseries + overlay prognozy (`p10/p50/p90`),
-    - przelaczaniem zakresu dat (`7d/30d/90d/custom`),
-    - sekcja raportu (insighty + top videos) i eksportu.
-- Testy:
-  - 68 testow pass, w tym:
-    - kontrakty shared,
-    - integracje IPC desktop,
-    - integracje sync/ml/pipeline,
-    - integracje reports (generowanie + eksport + render HTML),
-    - helpery zakresu dat w UI.
-- Standard regresji:
-  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — PASS.
+- Rozszerzono kontrakty IPC i DTO o profile/settings/auth:
+  - `profile:list`, `profile:create`, `profile:setActive`
+  - `settings:get`, `settings:update`
+  - `auth:getStatus`, `auth:connect`, `auth:disconnect`
+- Dodano `packages/core/src/queries/settings-queries.ts`:
+  - odczyt ustawien profilu z `app_meta`
+  - patch update z walidacja przez Zod
+- Dodano `apps/desktop/src/profile-manager.ts`:
+  - registry profili na dysku
+  - oddzielne katalogi i oddzielna DB per profil
+  - auth metadata + szyfrowany sekret auth
+- Podlaczono faze 8 do runtime desktop (`apps/desktop/src/main.ts`):
+  - `safeStorage` adapter
+  - init profile managera przy starcie
+  - automatyczny wybor/sciezka DB aktywnego profilu
+  - przeladowanie backendu po zmianie aktywnego profilu
+  - profile row synchronizowany do DB aktywnego profilu
+- Rozszerzono handlery IPC i preload bridge o nowe komendy fazy 8.
+- Rozszerzono UI (React + TanStack Query):
+  - lista profili + tworzenie + przelaczanie aktywnego profilu
+  - status/connect/disconnect konta YouTube
+  - ustawienia profilu (default channel, preset dat, metryka forecast, auto sync/ML)
+- Dodano testy:
+  - `apps/desktop/src/profile-manager.integration.test.ts`
+  - rozszerzone `apps/desktop/src/ipc-handlers.integration.test.ts`
+- Regresja:
+  - `pnpm lint` PASS
+  - `pnpm typecheck` PASS
+  - `pnpm test` PASS (72/72)
+  - `pnpm build` PASS
 
-## Co robic teraz — Faza 8: Auth + Profile + Settings
+## Co robic teraz - Faza 9: Import + Enrichment + Search
 
-**Cel:** uruchomic profile i ustawienia per profil, z bezpiecznym storage sekretow lokalnie.
+**Cel:** pozwolic na lokalny import danych CSV i ich natychmiastowe wlaczenie do analityki + dodac pelnotekstowe wyszukiwanie tresci.
 
 **Zakres:**
-1. Auth:
-   - status podlaczenia konta (connect/disconnect/status) jako kontrakt i UI flow.
-2. Profile:
-   - tworzenie i przelaczanie profili.
-   - separacja danych profilowych (osobne DB per profil).
-3. Settings:
-   - ustawienia per profil (provider, preferencje raportu/ML).
-4. Secret storage:
-   - bezpieczny zapis sekretow przez Electron `safeStorage`.
+1. Import CSV:
+   - parser CSV + mapowanie kolumn + preview
+   - walidacja schema/range (Zod) z raportem bledow (wiersz/kolumna)
+   - zapis importu do warstwy RAW/STAGING
+2. Integracja z pipeline:
+   - po poprawnym imporcie uruchomienie `runDataPipeline`
+   - odswiezenie KPI/timeseries/raportow
+3. Search:
+   - SQLite FTS5 (transkrypcje/opisy/tytuly)
+   - query + snippet + ranking
+4. IPC + UI:
+   - nowe komendy import/search po stronie desktop
+   - ekran importu i wyszukiwarki po stronie UI
 5. Testy:
-   - IPC + persistence profili i ustawien po restarcie.
+   - integracje importu (happy path + invalid CSV)
+   - integracje search (relevance + snippet)
 
-**Definition of Done (Faza 8):**
-- [ ] Dziala `connect/disconnect/status` dla konta.
-- [ ] Dwa profile dzialaja niezaleznie po restarcie aplikacji.
-- [ ] Ustawienia sa zapisywane i odczytywane per profil.
-- [ ] Sekrety nie sa trzymane w plaintext.
+**Definition of Done (Faza 9):**
+- [ ] Import CSV dziala z mapowaniem i walidacja.
+- [ ] Import triggeruje pipeline i dane sa widoczne na dashboardzie.
+- [ ] Search zwraca wynik + snippet + ranking.
+- [ ] Invalid CSV zwraca czytelny blad z numerem wiersza/kolumny.
 - [ ] Testy fazy przechodza.
-- [ ] `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — 0 errors.
+- [ ] `pnpm lint && pnpm typecheck && pnpm test && pnpm build` - 0 errors.
 - [ ] Wpis w `CHANGELOG_AI.md`.
-- [ ] Aktualizacja tego pliku (`NEXT_STEP.md`).
+- [ ] Aktualizacja `README.md` i `NEXT_STEP.md`.
 
-**Pliki do modyfikacji/stworzenia:**
+**Pliki do modyfikacji/stworzenia (start):**
 ```
-packages/shared/src/                  — DTO/IPC contracts auth/profile/settings
-packages/core/src/                    — schema + repository profile/settings
-apps/desktop/src/                     — handlery IPC + safeStorage bridge
-apps/ui/src/                          — ekran profilu i ustawien
+packages/shared/src/                  - DTO/IPC contracts import/search
+packages/core/src/                    - migracje + query/repository dla import/search
+packages/data-pipeline/src/           - podpiecie import source
+apps/desktop/src/                     - handlery IPC import/search
+apps/ui/src/                          - widok importu + widok search
 ```
 
 ## Krytyczne zasady (nie pomijaj)
 
-1. **Jezyk UI = POLSKI** — wszystkie komunikaty user-facing po polsku.
-2. **Zod 4** (nie 3) — import z `zod/v4`.
+1. **Jezyk UI = POLSKI** - wszystkie komunikaty user-facing po polsku.
+2. **Zod 4** (nie 3) - import z `zod/v4`.
 3. **ESLint 9** (nie 10).
 4. **Result<T, AppError>** zamiast throw w logice biznesowej.
 5. **Explicit ORDER BY** w kazdym SQL.
@@ -126,6 +126,6 @@ Szczegoly: `docs/PLAN_REALIZACJI.md`
 | 14 | Competitor Intelligence | M5 |
 | 15 | Topic Intelligence | M5 |
 | 16 | Planning System | M6 |
-| 17 | Plugins (Insights/Alerts) — SKIP (solo) | M6 |
+| 17 | Plugins (Insights/Alerts) - SKIP (solo) | M6 |
 | 18 | Diagnostics + Recovery | M6 |
 | 19 | Polish + Local UX (bez packaging/telemetry) | M6 |

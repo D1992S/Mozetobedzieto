@@ -45,6 +45,10 @@ export {
   createChannelQueries,
   type ChannelQueries,
 } from './queries/channel-queries.ts';
+export {
+  createSettingsQueries,
+  type SettingsQueries,
+} from './queries/settings-queries.ts';
 
 // Fixtures
 export {

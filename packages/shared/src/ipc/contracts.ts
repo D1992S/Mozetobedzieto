@@ -350,11 +350,101 @@ export type ReportExportResultDTO = z.infer<typeof ReportExportResultDTOSchema>;
 export const ReportExportResultSchema = IpcResultSchema(ReportExportResultDTOSchema);
 export type ReportExportResult = z.infer<typeof ReportExportResultSchema>;
 
+export const ProfileSummaryDTOSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  isActive: z.boolean(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export type ProfileSummaryDTO = z.infer<typeof ProfileSummaryDTOSchema>;
+
+export const ProfileListResultDTOSchema = z.object({
+  activeProfileId: z.string().nullable(),
+  profiles: z.array(ProfileSummaryDTOSchema),
+});
+
+export type ProfileListResultDTO = z.infer<typeof ProfileListResultDTOSchema>;
+export const ProfileListResultSchema = IpcResultSchema(ProfileListResultDTOSchema);
+export type ProfileListResult = z.infer<typeof ProfileListResultSchema>;
+
+export const ProfileCreateInputDTOSchema = z.object({
+  name: z.string().min(1).max(100),
+  setActive: z.boolean().default(true),
+});
+
+export type ProfileCreateInputDTO = z.infer<typeof ProfileCreateInputDTOSchema>;
+
+export const ProfileSetActiveInputDTOSchema = z.object({
+  profileId: z.string().min(1),
+});
+
+export type ProfileSetActiveInputDTO = z.infer<typeof ProfileSetActiveInputDTOSchema>;
+
+export const ProfileDefaultDatePresetSchema = z.enum(['7d', '30d', '90d']);
+export type ProfileDefaultDatePreset = z.infer<typeof ProfileDefaultDatePresetSchema>;
+
+export const ProfileSettingsDTOSchema = z.object({
+  defaultChannelId: z.string().min(1).default('UC-SEED-PL-001'),
+  preferredForecastMetric: MlTargetMetricSchema.default('views'),
+  defaultDatePreset: ProfileDefaultDatePresetSchema.default('30d'),
+  autoRunSync: z.boolean().default(false),
+  autoRunMl: z.boolean().default(false),
+  reportFormats: z.array(ReportExportFormatSchema).min(1).default(['json', 'csv', 'html']),
+  language: z.literal('pl').default('pl'),
+});
+
+export type ProfileSettingsDTO = z.infer<typeof ProfileSettingsDTOSchema>;
+export const ProfileSettingsResultSchema = IpcResultSchema(ProfileSettingsDTOSchema);
+export type ProfileSettingsResult = z.infer<typeof ProfileSettingsResultSchema>;
+
+export const SettingsUpdateInputDTOSchema = z.object({
+  settings: ProfileSettingsDTOSchema.partial().refine(
+    (value) => Object.keys(value).length > 0,
+    'Przekazano pusty patch ustawien.',
+  ),
+});
+
+export type SettingsUpdateInputDTO = z.infer<typeof SettingsUpdateInputDTOSchema>;
+
+export const AuthProviderSchema = z.enum(['youtube']);
+export type AuthProvider = z.infer<typeof AuthProviderSchema>;
+
+export const AuthStatusDTOSchema = z.object({
+  connected: z.boolean(),
+  provider: AuthProviderSchema.nullable(),
+  accountLabel: z.string().nullable(),
+  connectedAt: z.iso.datetime().nullable(),
+  storage: z.literal('safeStorage'),
+});
+
+export type AuthStatusDTO = z.infer<typeof AuthStatusDTOSchema>;
+export const AuthStatusResultSchema = IpcResultSchema(AuthStatusDTOSchema);
+export type AuthStatusResult = z.infer<typeof AuthStatusResultSchema>;
+
+export const AuthConnectInputDTOSchema = z.object({
+  provider: AuthProviderSchema.default('youtube'),
+  accountLabel: z.string().min(1).max(200),
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1).nullable().optional(),
+});
+
+export type AuthConnectInputDTO = z.infer<typeof AuthConnectInputDTOSchema>;
+
 export const IPC_CHANNELS = {
   APP_GET_STATUS: 'app:getStatus',
   APP_GET_DATA_MODE: 'app:getDataMode',
   APP_SET_DATA_MODE: 'app:setDataMode',
   APP_PROBE_DATA_MODE: 'app:probeDataMode',
+  PROFILE_LIST: 'profile:list',
+  PROFILE_CREATE: 'profile:create',
+  PROFILE_SET_ACTIVE: 'profile:setActive',
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_UPDATE: 'settings:update',
+  AUTH_GET_STATUS: 'auth:getStatus',
+  AUTH_CONNECT: 'auth:connect',
+  AUTH_DISCONNECT: 'auth:disconnect',
   SYNC_START: 'sync:start',
   SYNC_RESUME: 'sync:resume',
   ML_RUN_BASELINE: 'ml:runBaseline',

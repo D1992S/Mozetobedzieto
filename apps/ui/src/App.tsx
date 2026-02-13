@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import type {
   MlForecastPointDTO,
   MlTargetMetric,
@@ -13,18 +13,26 @@ import {
   buildDateRange,
   isDateRangeValid,
   useAppStatusQuery,
+  useAuthStatusQuery,
   useChannelInfoQuery,
+  useConnectAuthMutation,
+  useCreateProfileMutation,
   useDashboardReportQuery,
   useDataModeStatusQuery,
+  useDisconnectAuthMutation,
   useExportDashboardReportMutation,
   useKpisQuery,
   useMlForecastQuery,
   useProbeDataModeMutation,
+  useProfileSettingsQuery,
+  useProfilesQuery,
   useResumeSyncMutation,
   useRunMlBaselineMutation,
+  useSetActiveProfileMutation,
   useSetDataModeMutation,
   useStartSyncMutation,
   useTimeseriesQuery,
+  useUpdateProfileSettingsMutation,
   type DateRange,
   type DateRangePreset,
 } from './hooks/use-dashboard-data.ts';
@@ -262,8 +270,44 @@ export function App() {
   const [resumeSyncRunId, setResumeSyncRunId] = useState<number | null>(null);
   const [datePreset, setDatePreset] = useState<DateRangePreset>('30d');
   const [customRange, setCustomRange] = useState<DateRange>(() => buildDateRange(30));
-  const mlTargetMetric: MlTargetMetric = 'views';
-  const exportFormats: ReportExportFormat[] = ['json', 'csv', 'html'];
+  const [newProfileName, setNewProfileName] = useState('');
+  const [settingsChannelIdDraft, setSettingsChannelIdDraft] = useState(DEFAULT_CHANNEL_ID);
+  const [authAccountLabel, setAuthAccountLabel] = useState('');
+  const [authAccessToken, setAuthAccessToken] = useState('');
+  const [authRefreshToken, setAuthRefreshToken] = useState('');
+
+  const statusQuery = useAppStatusQuery();
+  const dataModeQuery = useDataModeStatusQuery(isDesktopRuntime);
+  const profilesQuery = useProfilesQuery(isDesktopRuntime);
+  const createProfileMutation = useCreateProfileMutation();
+  const setActiveProfileMutation = useSetActiveProfileMutation();
+  const settingsQuery = useProfileSettingsQuery(isDesktopRuntime && statusQuery.data?.dbReady === true);
+  const updateSettingsMutation = useUpdateProfileSettingsMutation();
+  const authStatusQuery = useAuthStatusQuery(isDesktopRuntime);
+  const connectAuthMutation = useConnectAuthMutation();
+  const disconnectAuthMutation = useDisconnectAuthMutation();
+  const setModeMutation = useSetDataModeMutation();
+  const probeModeMutation = useProbeDataModeMutation();
+  const startSyncMutation = useStartSyncMutation();
+  const resumeSyncMutation = useResumeSyncMutation();
+  const runMlMutation = useRunMlBaselineMutation();
+  const exportReportMutation = useExportDashboardReportMutation();
+
+  useEffect(() => {
+    const defaultDatePreset = settingsQuery.data?.defaultDatePreset;
+    if (!defaultDatePreset) {
+      return;
+    }
+    setDatePreset((currentPreset) => (currentPreset === 'custom' ? currentPreset : defaultDatePreset));
+  }, [settingsQuery.data?.defaultDatePreset]);
+
+  useEffect(() => {
+    const defaultChannelId = settingsQuery.data?.defaultChannelId;
+    if (!defaultChannelId) {
+      return;
+    }
+    setSettingsChannelIdDraft(defaultChannelId);
+  }, [settingsQuery.data?.defaultChannelId]);
 
   const dateRange = useMemo<DateRange>(() => {
     if (datePreset === 'custom') {
@@ -278,22 +322,16 @@ export function App() {
     return buildDateRange(30);
   }, [customRange, datePreset]);
 
-  const channelId = DEFAULT_CHANNEL_ID;
+  const channelId = settingsQuery.data?.defaultChannelId ?? DEFAULT_CHANNEL_ID;
+  const mlTargetMetric: MlTargetMetric = settingsQuery.data?.preferredForecastMetric ?? 'views';
+  const exportFormats: ReportExportFormat[] = settingsQuery.data?.reportFormats ?? ['json', 'csv', 'html'];
+  const timeseriesMetric: 'views' | 'subscribers' = mlTargetMetric === 'subscribers' ? 'subscribers' : 'views';
   const validRange = isDateRangeValid(dateRange);
-
-  const statusQuery = useAppStatusQuery();
-  const dataModeQuery = useDataModeStatusQuery(isDesktopRuntime);
-  const setModeMutation = useSetDataModeMutation();
-  const probeModeMutation = useProbeDataModeMutation();
-  const startSyncMutation = useStartSyncMutation();
-  const resumeSyncMutation = useResumeSyncMutation();
-  const runMlMutation = useRunMlBaselineMutation();
-  const exportReportMutation = useExportDashboardReportMutation();
 
   const dataEnabled = isDesktopRuntime && statusQuery.data?.dbReady === true && validRange;
   const channelInfoQuery = useChannelInfoQuery(channelId, dataEnabled);
   const kpisQuery = useKpisQuery(channelId, dateRange, dataEnabled);
-  const timeseriesQuery = useTimeseriesQuery(channelId, dateRange, 'views', dataEnabled);
+  const timeseriesQuery = useTimeseriesQuery(channelId, dateRange, timeseriesMetric, dataEnabled);
   const mlForecastQuery = useMlForecastQuery(channelId, mlTargetMetric, dataEnabled);
   const reportQuery = useDashboardReportQuery(channelId, dateRange, mlTargetMetric, dataEnabled);
 
@@ -385,7 +423,7 @@ export function App() {
       }}
     >
       <header style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ marginBottom: 6 }}>Mozetobedzieto - Dashboard (Faza 7)</h1>
+        <h1 style={{ marginBottom: 6 }}>Mozetobedzieto - Dashboard (Faza 8)</h1>
         <p style={{ marginTop: 0, color: '#475569' }}>
           Status DB: {appStatus.dbReady ? 'Gotowa' : 'Niegotowa'} | Profil: {appStatus.profileId ?? 'Brak'} | Sync: {appStatus.syncRunning ? 'w trakcie' : 'bez aktywnego procesu'}
         </p>
@@ -393,6 +431,253 @@ export function App() {
           Ostatni sync: {appStatus.lastSyncAt ?? 'Brak'}
         </p>
       </header>
+
+      <section style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #d7e2ef', borderRadius: 12, background: '#fff' }}>
+        <h2 style={{ marginTop: 0 }}>Profile i konto YouTube</h2>
+        {profilesQuery.isLoading && <p>Odczyt profili...</p>}
+        {profilesQuery.isError && <p>Nie udało się odczytać listy profili.</p>}
+        {profilesQuery.data && (
+          <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+            {profilesQuery.data.profiles.map((profile) => (
+              <div
+                key={profile.id}
+                style={{
+                  border: '1px solid #d7e2ef',
+                  borderRadius: 10,
+                  padding: '0.6rem',
+                  background: profile.isActive ? '#ecfeff' : '#ffffff',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span>
+                  <strong>{profile.name}</strong> {profile.isActive ? '(aktywny)' : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveProfileMutation.mutate({ profileId: profile.id });
+                  }}
+                  disabled={profile.isActive || setActiveProfileMutation.isPending}
+                >
+                  Ustaw jako aktywny
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <input
+            type="text"
+            value={newProfileName}
+            onChange={(event) => {
+              setNewProfileName(event.target.value);
+            }}
+            placeholder="Nazwa nowego profilu"
+            style={{ minWidth: 250 }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const nextName = newProfileName.trim();
+              if (!nextName) {
+                return;
+              }
+              createProfileMutation.mutate(
+                { name: nextName, setActive: true },
+                {
+                  onSuccess: () => {
+                    setNewProfileName('');
+                  },
+                },
+              );
+            }}
+            disabled={createProfileMutation.isPending || newProfileName.trim().length === 0}
+          >
+            Dodaj profil i aktywuj
+          </button>
+        </div>
+
+        {createProfileMutation.isError && <p>Nie udało się utworzyć profilu.</p>}
+        {setActiveProfileMutation.isError && <p>Nie udało się przełączyć aktywnego profilu.</p>}
+
+        <h3 style={{ marginBottom: 8 }}>Połączenie konta YouTube</h3>
+        {authStatusQuery.isLoading && <p>Odczyt statusu konta...</p>}
+        {authStatusQuery.isError && <p>Nie udało się odczytać statusu konta.</p>}
+        {authStatusQuery.data?.connected ? (
+          <div>
+            <p style={{ marginTop: 0 }}>
+              Połączono: <strong>{authStatusQuery.data.accountLabel ?? 'konto bez etykiety'}</strong>
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                disconnectAuthMutation.mutate();
+              }}
+              disabled={disconnectAuthMutation.isPending}
+            >
+              Rozłącz konto
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 8, maxWidth: 520 }}>
+            <input
+              type="text"
+              value={authAccountLabel}
+              onChange={(event) => {
+                setAuthAccountLabel(event.target.value);
+              }}
+              placeholder="Etykieta konta (np. Mój kanał)"
+            />
+            <input
+              type="password"
+              value={authAccessToken}
+              onChange={(event) => {
+                setAuthAccessToken(event.target.value);
+              }}
+              placeholder="Access token"
+            />
+            <input
+              type="password"
+              value={authRefreshToken}
+              onChange={(event) => {
+                setAuthRefreshToken(event.target.value);
+              }}
+              placeholder="Refresh token (opcjonalnie)"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                connectAuthMutation.mutate(
+                  {
+                    provider: 'youtube',
+                    accountLabel: authAccountLabel.trim(),
+                    accessToken: authAccessToken.trim(),
+                    refreshToken: authRefreshToken.trim() || null,
+                  },
+                  {
+                    onSuccess: () => {
+                      setAuthAccessToken('');
+                      setAuthRefreshToken('');
+                    },
+                  },
+                );
+              }}
+              disabled={
+                connectAuthMutation.isPending
+                || authAccountLabel.trim().length === 0
+                || authAccessToken.trim().length === 0
+              }
+            >
+              Połącz konto
+            </button>
+          </div>
+        )}
+
+        {connectAuthMutation.isError && <p>Nie udało się podłączyć konta.</p>}
+        {disconnectAuthMutation.isError && <p>Nie udało się rozłączyć konta.</p>}
+      </section>
+
+      <section style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #d7e2ef', borderRadius: 12, background: '#fff' }}>
+        <h2 style={{ marginTop: 0 }}>Ustawienia profilu</h2>
+        {settingsQuery.isLoading && <p>Odczyt ustawień profilu...</p>}
+        {settingsQuery.isError && <p>Nie udało się odczytać ustawień profilu.</p>}
+        {settingsQuery.data && (
+          <>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              <input
+                type="text"
+                value={settingsChannelIdDraft}
+                onChange={(event) => {
+                  setSettingsChannelIdDraft(event.target.value);
+                }}
+                placeholder="Domyślny channelId"
+                style={{ minWidth: 280 }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const nextChannelId = settingsChannelIdDraft.trim();
+                  if (!nextChannelId) {
+                    return;
+                  }
+                  updateSettingsMutation.mutate({ defaultChannelId: nextChannelId });
+                }}
+                disabled={updateSettingsMutation.isPending || settingsChannelIdDraft.trim().length === 0}
+              >
+                Zapisz domyślny kanał
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {(['7d', '30d', '90d'] as const).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    updateSettingsMutation.mutate({ defaultDatePreset: preset });
+                  }}
+                  disabled={updateSettingsMutation.isPending}
+                  style={{
+                    borderRadius: 8,
+                    border: settingsQuery.data.defaultDatePreset === preset ? '2px solid #0f766e' : '1px solid #cbd5e1',
+                    background: settingsQuery.data.defaultDatePreset === preset ? '#e6fffa' : '#ffffff',
+                  }}
+                >
+                  Domyślny zakres: {preset}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettingsMutation.mutate({ preferredForecastMetric: 'views' });
+                }}
+                disabled={updateSettingsMutation.isPending}
+              >
+                Metryka prognozy: wyświetlenia
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettingsMutation.mutate({ preferredForecastMetric: 'subscribers' });
+                }}
+                disabled={updateSettingsMutation.isPending}
+              >
+                Metryka prognozy: subskrypcje
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettingsMutation.mutate({ autoRunSync: !settingsQuery.data.autoRunSync });
+                }}
+                disabled={updateSettingsMutation.isPending}
+              >
+                Auto sync: {settingsQuery.data.autoRunSync ? 'włączony' : 'wyłączony'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettingsMutation.mutate({ autoRunMl: !settingsQuery.data.autoRunMl });
+                }}
+                disabled={updateSettingsMutation.isPending}
+              >
+                Auto ML: {settingsQuery.data.autoRunMl ? 'włączony' : 'wyłączony'}
+              </button>
+            </div>
+          </>
+        )}
+        {updateSettingsMutation.isError && <p>Nie udało się zapisać ustawień profilu.</p>}
+      </section>
 
       <section style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #d7e2ef', borderRadius: 12, background: '#fff' }}>
         <h2 style={{ marginTop: 0 }}>Zakres dat</h2>
@@ -487,7 +772,12 @@ export function App() {
         {timeseriesQuery.isLoading || mlForecastQuery.isLoading ? <p>Ładowanie wykresu...</p> : null}
         {timeseriesQuery.isError ? <p>Nie udało się odczytać szeregu czasowego.</p> : null}
         {mlForecastQuery.isError ? <p>Nie udało się odczytać prognozy ML.</p> : null}
-        {chartPoints.length > 0 && <ForecastChart points={chartPoints} metricLabel="wyświetleń" />}
+        {chartPoints.length > 0 && (
+          <ForecastChart
+            points={chartPoints}
+            metricLabel={mlTargetMetric === 'views' ? 'wyświetleń' : 'subskrypcji'}
+          />
+        )}
       </section>
 
       <section style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #d7e2ef', borderRadius: 12, background: '#fff' }}>

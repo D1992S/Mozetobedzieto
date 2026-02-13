@@ -9,6 +9,12 @@ import {
   MlForecastResultDTOSchema,
   MlRunBaselineInputDTOSchema,
   MlRunBaselineResultDTOSchema,
+  AuthConnectInputDTOSchema,
+  AuthStatusDTOSchema,
+  ProfileCreateInputDTOSchema,
+  ProfileListResultDTOSchema,
+  ProfileSettingsDTOSchema,
+  ProfileSetActiveInputDTOSchema,
   ReportExportInputDTOSchema,
   ReportExportResultDTOSchema,
   ReportGenerateInputDTOSchema,
@@ -380,12 +386,71 @@ describe('IPC Contracts', () => {
     });
   });
 
+  describe('Profile/Auth/Settings DTO', () => {
+    it('validates profile create/list/set-active payloads', () => {
+      const createInput = ProfileCreateInputDTOSchema.parse({
+        name: 'Profil testowy',
+      });
+      expect(createInput.setActive).toBe(true);
+
+      const setActiveInput = ProfileSetActiveInputDTOSchema.parse({
+        profileId: 'PROFILE-TEST-001',
+      });
+      expect(setActiveInput.profileId).toBe('PROFILE-TEST-001');
+
+      const listResult = ProfileListResultDTOSchema.parse({
+        activeProfileId: 'PROFILE-TEST-001',
+        profiles: [
+          {
+            id: 'PROFILE-TEST-001',
+            name: 'Profil testowy',
+            isActive: true,
+            createdAt: '2026-02-12T23:30:00.000Z',
+            updatedAt: '2026-02-12T23:30:00.000Z',
+          },
+        ],
+      });
+      expect(listResult.profiles).toHaveLength(1);
+    });
+
+    it('validates settings defaults and auth payloads', () => {
+      const settings = ProfileSettingsDTOSchema.parse({});
+      expect(settings.defaultDatePreset).toBe('30d');
+      expect(settings.preferredForecastMetric).toBe('views');
+      expect(settings.language).toBe('pl');
+
+      const authConnectInput = AuthConnectInputDTOSchema.parse({
+        provider: 'youtube',
+        accountLabel: 'Kanał Testowy',
+        accessToken: 'token-value',
+      });
+      expect(authConnectInput.provider).toBe('youtube');
+
+      const authStatus = AuthStatusDTOSchema.parse({
+        connected: true,
+        provider: 'youtube',
+        accountLabel: 'Kanał Testowy',
+        connectedAt: '2026-02-12T23:30:00.000Z',
+        storage: 'safeStorage',
+      });
+      expect(authStatus.connected).toBe(true);
+    });
+  });
+
   describe('Channel constants', () => {
     it('IPC_CHANNELS has expected keys', () => {
       expect(IPC_CHANNELS.APP_GET_STATUS).toBe('app:getStatus');
       expect(IPC_CHANNELS.APP_GET_DATA_MODE).toBe('app:getDataMode');
       expect(IPC_CHANNELS.APP_SET_DATA_MODE).toBe('app:setDataMode');
       expect(IPC_CHANNELS.APP_PROBE_DATA_MODE).toBe('app:probeDataMode');
+      expect(IPC_CHANNELS.PROFILE_LIST).toBe('profile:list');
+      expect(IPC_CHANNELS.PROFILE_CREATE).toBe('profile:create');
+      expect(IPC_CHANNELS.PROFILE_SET_ACTIVE).toBe('profile:setActive');
+      expect(IPC_CHANNELS.SETTINGS_GET).toBe('settings:get');
+      expect(IPC_CHANNELS.SETTINGS_UPDATE).toBe('settings:update');
+      expect(IPC_CHANNELS.AUTH_GET_STATUS).toBe('auth:getStatus');
+      expect(IPC_CHANNELS.AUTH_CONNECT).toBe('auth:connect');
+      expect(IPC_CHANNELS.AUTH_DISCONNECT).toBe('auth:disconnect');
       expect(IPC_CHANNELS.SYNC_START).toBe('sync:start');
       expect(IPC_CHANNELS.SYNC_RESUME).toBe('sync:resume');
       expect(IPC_CHANNELS.ML_RUN_BASELINE).toBe('ml:runBaseline');
